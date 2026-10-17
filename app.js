@@ -1,4 +1,5 @@
 import { count, exportBackup, getSetting, importBackup, requestPersistence, setSetting } from './db.js';
+import { EXERCISES, PROGRAM, nextMonday, otherOption, sessionFor, videoUrl, weekVariant } from './exercises.js';
 
 const ICONS = {
   hoy: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
@@ -32,10 +33,62 @@ function renderNav() {
   }).join('');
 }
 
+let libraryOpen = false;
+const lib = { day: 'push', variant: null };
+
 function go(id) {
   current = id;
+  libraryOpen = false;
   history.replaceState(null, '', '#' + id);
   render();
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function programVariant() {
+  let start = await getSetting('programStart');
+  if (!start) {
+    start = nextMonday(new Date()).toISOString();
+    await setSetting('programStart', start);
+  }
+  return weekVariant(new Date(), new Date(start));
+}
+
+async function renderLibrary() {
+  const thisWeek = await programVariant();
+  if (!lib.variant) lib.variant = thisWeek;
+  const items = sessionFor(lib.day, lib.variant);
+  const chip = (on, attrs, label) => `<button class="chip" ${attrs} aria-pressed="${on}">${label}</button>`;
+  app.innerHTML = `
+    <button class="back" id="lib-back">${svg('<path d="M15 5l-7 7 7 7"/>', 18, 2.5)}Ajustes</button>
+    <div class="head"><span class="eyebrow">Tus 3 días</span><h1>Ejercicios</h1></div>
+    <div class="chips" role="group" aria-label="Día">
+      ${Object.entries(PROGRAM).map(([id, d]) => chip(id === lib.day, `data-day="${id}"`, d.name)).join('')}
+    </div>
+    <div class="chips" role="group" aria-label="Semana">
+      ${['A', 'B'].map((v) => chip(v === lib.variant, `data-variant="${v}"`, 'Semana ' + v)).join('')}
+    </div>
+    <span class="muted small">Esta semana te toca la semana ${thisWeek}.</span>
+    <div class="exlist">
+      ${items.map((ex, i) => {
+        const alt = otherOption(lib.day, ex.id);
+        return `<details>
+          <summary><span class="num">${i + 1}</span><span class="exname"><strong>${esc(ex.name)}</strong><span class="muted small">${esc(ex.muscle)} · ${ex.sets} × ${ex.reps[0]}-${ex.reps[1]}</span></span>${svg('<path d="M6 9l6 6 6-6"/>', 20, 2.5)}</summary>
+          <div class="detail">
+            ${ex.tecnica ? '<span class="tag">Aprende primero la técnica con poco peso</span>' : ''}
+            <ul>${ex.cues.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>
+            <div class="muted small">${esc(ex.equip)}${ex.carga === 'mancuerna' ? ' · saltos de 2,5 kg' : ''}</div>
+            ${alt ? `<div class="muted small">La otra semana: ${esc(EXERCISES[alt].name)}</div>` : ''}
+            <a class="btn link" href="${videoUrl(ex.id)}" target="_blank" rel="noopener">${svg('<path d="M8 5.5v13l11-6.5z"/>', 16, 2)}Ver vídeo de la técnica</a>
+          </div>
+        </details>`;
+      }).join('')}
+    </div>
+    <span class="muted small">Los rangos de repeticiones son convenciones habituales para hipertrofia. La app los ajustará según tu rendimiento.</span>`;
+  document.getElementById('lib-back').addEventListener('click', () => { libraryOpen = false; render(); });
+  app.querySelectorAll('[data-day]').forEach((b) => b.addEventListener('click', () => { lib.day = b.dataset.day; renderLibrary(); }));
+  app.querySelectorAll('[data-variant]').forEach((b) => b.addEventListener('click', () => { lib.variant = b.dataset.variant; renderLibrary(); }));
+  app.scrollTop = 0;
 }
 
 nav.addEventListener('click', (e) => {
@@ -46,7 +99,7 @@ nav.addEventListener('click', (e) => {
 function render() {
   renderNav();
   const tab = TABS.find((t) => t.id === current);
-  if (tab.id === 'ajustes') return renderSettings(tab);
+  if (tab.id === 'ajustes') return libraryOpen ? renderLibrary() : renderSettings(tab);
   app.innerHTML = `
     <div class="head"><span class="eyebrow">${tab.eyebrow}</span><h1>${tab.title}</h1></div>
     <div class="placeholder"><strong>Próximamente</strong><span>${tab.soon}</span><span>Se construye en la ${tab.phase}.</span></div>`;
@@ -84,12 +137,16 @@ async function renderSettings(tab) {
       </div>
       <div class="msg" id="msg" role="status"></div>
     </div>
+    <button class="btn" id="open-lib" style="flex:none;justify-content:space-between;padding:0 16px">
+      <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M4 6h16M4 12h16M4 18h10"/>', 18, 2.5)}Ejercicios de Push, Pull y Legs</span>${svg('<path d="M9 5l7 7-7 7"/>', 18, 2.5)}
+    </button>
     <div class="card list">
       <div class="item"><span>Series guardadas</span><span>${logs}</span></div>
       <div class="item"><span>Pesos corporales</span><span>${weights}</span></div>
       <div class="item"><span>Almacenamiento protegido</span><span>${persisted === null ? 'No disponible' : persisted ? 'Sí' : 'No'}</span></div>
       <div class="item"><span>Versión</span><span>0.1 · base técnica</span></div>
     </div>`;
+  document.getElementById('open-lib').addEventListener('click', () => { libraryOpen = true; renderLibrary(); });
   document.getElementById('export').addEventListener('click', doExport);
   document.getElementById('import').addEventListener('change', doImport);
 }

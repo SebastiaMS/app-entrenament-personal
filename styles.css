@@ -121,3 +121,38 @@ nav#nav button {
 }
 nav#nav button[aria-current="page"] { color: var(--ochre-text); font-weight: 800; }
 nav#nav svg { stroke: currentColor; }
+
+/* Biblioteca de ejercicios */
+.back {
+  align-self: flex-start; min-height: 44px; display: flex; align-items: center; gap: 4px;
+  background: none; border: none; padding: 0; font-family: inherit; font-size: 16px; font-weight: 700;
+  color: var(--ochre-text); cursor: pointer;
+}
+.back svg { stroke: currentColor; }
+.chips { display: flex; gap: 8px; }
+.chip {
+  flex: 1; min-height: 44px; border-radius: 12px; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  background: #FFFFFF; color: var(--text); border: 1.5px solid #E3D9C6;
+}
+.chip[aria-pressed="true"] { background: var(--tint); color: var(--ochre-dark); border-color: var(--ochre); font-weight: 800; }
+.exlist { display: flex; flex-direction: column; gap: 10px; }
+.exlist details { background: var(--card); border: 1.5px solid var(--line); border-radius: 16px; }
+.exlist summary {
+  min-height: 60px; display: flex; align-items: center; gap: 12px; padding: 8px 14px; cursor: pointer; list-style: none;
+}
+.exlist summary::-webkit-details-marker { display: none; }
+.exlist summary svg { stroke: var(--muted); flex-shrink: 0; transition: transform .15s; }
+.exlist details[open] summary svg { transform: rotate(180deg); }
+.exlist .num {
+  width: 28px; height: 28px; border-radius: 14px; background: var(--tint); color: var(--ochre-dark);
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0;
+}
+.exlist .exname { flex: 1; display: flex; flex-direction: column; gap: 1px; font-size: 16px; }
+.exlist .detail { padding: 0 16px 16px 16px; display: flex; flex-direction: column; gap: 10px; border-top: 1.5px solid #F1E9D8; padding-top: 12px; }
+.exlist ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; line-height: 1.4; }
+.tag { align-self: flex-start; padding: 4px 10px; background: var(--tint); color: var(--ochre-dark); border-radius: 999px; font-size: 13px; font-weight: 800; }
+a.btn.link {
+  flex: none; min-height: 48px; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 12px; border: 1.5px solid var(--green); color: var(--green); font-weight: 700; font-size: 16px; background: #FFFFFF;
+}
+a.btn.link svg { fill: currentColor; stroke: currentColor; }
