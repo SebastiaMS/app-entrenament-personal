@@ -1,6 +1,7 @@
 import { count, exportBackup, getSetting, importBackup, requestPersistence, setSetting } from './db.js';
 import { EXERCISES, PROGRAM, otherOption, sessionFor, videoUrl } from './exercises.js';
 import { programVariant, renderToday } from './train.js';
+import { renderHistory } from './history.js';
 
 const ICONS = {
   hoy: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
@@ -92,6 +93,7 @@ function render() {
   renderNav();
   const tab = TABS.find((t) => t.id === current);
   if (tab.id === 'ajustes') return libraryOpen ? renderLibrary() : renderSettings(tab);
+  if (tab.id === 'historial') return renderHistory(app);
   if (tab.id === 'hoy') return renderToday(app, { immersive: (on) => { nav.style.display = on ? 'none' : ''; } });
   app.innerHTML = `
     <div class="head"><span class="eyebrow">${tab.eyebrow}</span><h1>${tab.title}</h1></div>
@@ -105,6 +107,7 @@ function fmtDate(iso) {
 }
 
 async function renderSettings(tab) {
+  const restSound = await getSetting('restSound', true);
   const [lastBackup, persisted, logs, weights] = await Promise.all([
     getSetting('lastBackup'),
     navigator.storage && navigator.storage.persisted ? navigator.storage.persisted() : null,
@@ -130,6 +133,10 @@ async function renderSettings(tab) {
       </div>
       <div class="msg" id="msg" role="status"></div>
     </div>
+    <button class="btn" id="toggle-sound" role="switch" aria-checked="${restSound}" style="flex:none;justify-content:space-between;padding:0 16px">
+      <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>', 18, 2.5)}Sonido al acabar el descanso</span>
+      <span style="color:${restSound ? 'var(--green)' : 'var(--muted)'};font-weight:800">${restSound ? 'Sí' : 'No'}</span>
+    </button>
     <button class="btn" id="open-lib" style="flex:none;justify-content:space-between;padding:0 16px">
       <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M4 6h16M4 12h16M4 18h10"/>', 18, 2.5)}Ejercicios de Push, Pull y Legs</span>${svg('<path d="M9 5l7 7-7 7"/>', 18, 2.5)}
     </button>
@@ -139,6 +146,10 @@ async function renderSettings(tab) {
       <div class="item"><span>Almacenamiento protegido</span><span>${persisted === null ? 'No disponible' : persisted ? 'Sí' : 'No'}</span></div>
       <div class="item"><span>Versión</span><span>0.1 · base técnica</span></div>
     </div>`;
+  document.getElementById('toggle-sound').addEventListener('click', async () => {
+    await setSetting('restSound', !restSound);
+    renderSettings(tab);
+  });
   document.getElementById('open-lib').addEventListener('click', () => { libraryOpen = true; renderLibrary(); });
   document.getElementById('export').addEventListener('click', doExport);
   document.getElementById('import').addEventListener('change', doImport);

@@ -1,20 +1,14 @@
 // Pantallas Hoy (sesión que toca) y Entrenar (registrar series con temporizador).
 import { del, getAll, getByIndex, getSetting, put, setSetting } from './db.js';
 import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } from './exercises.js';
+import { beep, esc, flashCard, fmtClock, keepAwake, localDate, releaseAwake, svg, toast, unlockAudio } from './util.js';
+import { ROUTINES, doneToday, favorites, routineMinutes, startMobility, suggestedRoutine, toggleFavorite } from './mobility.js';
 
 const DAYS = ['push', 'pull', 'legs'];
 const DEFAULT_REST = 90;
 
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmtKg = (n) => String(n).replace('.', ',');
 const parseNum = (v) => parseFloat(String(v).replace(',', '.'));
-function localDate(d = new Date()) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-function svg(path, size = 20, sw = 2.5, extra = '') {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${path}</svg>`;
-}
 
 // ---------- Programa: semana A/B ----------
 export async function programVariant() {
@@ -40,9 +34,9 @@ let view = 'today';    // today | train | done
 let pickedDay = null;  // día elegido en Hoy
 let summary = null;
 let timerId = null;
-let audioCtx = null;
-let wakeLock = null;
 let resumed = false;
+let pickedRoutine = null;  // rutina de movilidad elegida en Hoy
+let routinesOpen = false;  // lista de rutinas desplegada
 
 function persist() {
   return setSetting('activeSession', session);
@@ -92,8 +86,38 @@ async function showToday() {
   const dateTxt = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
 
   const done = session ? Object.values(session.sets).flat().filter((s) => s.done).length : 0;
+
+  // Tarjeta de movilidad: propone la rutina siguiente de la rotación y deja elegir otra
+  const mobDone = await doneToday();
+  const favs = await favorites();
+  const routineId = pickedRoutine || (await suggestedRoutine());
+  const R = ROUTINES[routineId];
+  const ordered = Object.keys(ROUTINES).sort((a, b) => (favs.includes(b) ? 1 : 0) - (favs.includes(a) ? 1 : 0));
+  const star = (on) => svg('<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8 6.8 19.6l1-5.8L3.5 9.7l5.9-.9z"/>', 22, 2, on ? 'fill="currentColor"' : '');
+  const mobCard = `
+    <div class="card" id="mob-home">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="eyebrow">Movilidad · ≈ ${routineMinutes(routineId)} min</span>
+        ${mobDone.length ? '<span class="tag" style="background:var(--green-tint);color:var(--green)">Hecha hoy</span>' : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:20px;font-weight:800;line-height:1.15">${esc(R.name)}</span>
+        <span class="muted small">${R.ids.length} ejercicios · ${esc(R.zone)}</span>
+      </div>
+      <button class="btn" id="mob-start" style="flex:none;color:var(--green);border-color:var(--green)">${svg('<path d="M8 5.5v13l11-6.5z"/>', 16, 2, 'fill="currentColor"')}${mobDone.length ? 'Hacer otra rutina' : 'Empezar movilidad'}</button>
+      <details class="routines" id="routines" ${routinesOpen ? 'open' : ''}>
+        <summary>Cambiar de rutina</summary>
+        ${ordered.map((id) => `
+          <div class="rrow">
+            <button class="rpick" data-routine="${id}" aria-pressed="${id === routineId}"><strong>${esc(ROUTINES[id].name)}</strong><span class="muted small">${ROUTINES[id].ids.length} ejercicios · ≈ ${routineMinutes(id)} min</span></button>
+            <button class="rfav" data-fav="${id}" aria-pressed="${favs.includes(id)}" aria-label="Favorita: ${esc(ROUTINES[id].name)}">${star(favs.includes(id))}</button>
+          </div>`).join('')}
+      </details>
+    </div>`;
+
   host.innerHTML = `
     <div class="head"><span class="eyebrow">${esc(dateTxt)}</span><h1>Hoy</h1></div>
+    ${mobCard}
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
         <span class="eyebrow">${session ? 'Sesión en curso' : 'Te toca'}</span>
@@ -120,8 +144,14 @@ async function showToday() {
       </div>
       <p>Por defecto te propone el siguiente día del ciclo Push, Pull, Legs. ${lastSession ? 'Última sesión: ' + PROGRAM[lastSession.day].name + ', ' + relDay(lastSession.finishedAt) + '.' : 'Aún no has registrado ninguna sesión.'}</p>
     </div>`}
-    <div class="placeholder" style="min-height:90px"><strong>Movilidad diaria</strong><span>Se añade en el siguiente paso de la Fase 3.</span></div>`;
+`;
   host.querySelectorAll('[data-day]').forEach((b) => b.addEventListener('click', () => { pickedDay = b.dataset.day; showToday(); }));
+  document.getElementById('routines').addEventListener('toggle', (e) => { routinesOpen = e.target.open; });
+  host.querySelectorAll('[data-routine]').forEach((b) => b.addEventListener('click', () => { pickedRoutine = b.dataset.routine; showToday(); }));
+  host.querySelectorAll('[data-fav]').forEach((b) => b.addEventListener('click', async () => { await toggleFavorite(b.dataset.fav); showToday(); }));
+  document.getElementById('mob-start').addEventListener('click', () => {
+    startMobility(host, hooks, routineId, () => { pickedRoutine = null; showToday(); });
+  });
   document.getElementById('go').addEventListener('click', async () => {
     if (!session) await startSession(day);
     view = 'train';
@@ -173,7 +203,7 @@ function elapsedMin() {
 
 async function showTrain() {
   hooks.immersive && hooks.immersive(true);
-  requestWakeLock();
+  keepAwake();
   const id = session.ids[session.idx];
   const ex = EXERCISES[id];
   const sets = session.sets[id];
@@ -290,7 +320,7 @@ async function toggleSet(exId, i) {
   if (!s.done) {
     if (s.w === '' && EXERCISES[exId].carga === 'peso-corporal') s.w = 0; // sin lastre: el peso queda en 0
     if (s.w === '' || !(s.w >= 0) || !(s.r > 0)) {
-      flash(s.w !== '' && !(s.r > 0) ? 'Escribe las repeticiones.' : 'Escribe el peso y las repeticiones.');
+      toast(s.w !== '' && !(s.r > 0) ? 'Escribe las repeticiones.' : 'Escribe el peso y las repeticiones.');
       return;
     }
     s.done = true;
@@ -298,7 +328,7 @@ async function toggleSet(exId, i) {
     const rest = await getSetting('restSeconds', DEFAULT_REST);
     session.restTotal = rest;
     session.restEnd = Date.now() + rest * 1000;
-    try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) { /* sin sonido */ }
+    if (await getSetting('restSound', true)) unlockAudio();
   } else {
     s.done = false;
     await del('logs', `${session.id}-${exId}-${i}`);
@@ -307,21 +337,7 @@ async function toggleSet(exId, i) {
   showTrain();
 }
 
-function flash(text) {
-  let el = document.getElementById('toast');
-  if (!el) { el = document.createElement('div'); el.id = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
-  el.textContent = text;
-  el.classList.add('show');
-  clearTimeout(flash.t);
-  flash.t = setTimeout(() => el.classList.remove('show'), 2200);
-}
-
 // ---------- Temporizador de descanso ----------
-function fmtClock(sec) {
-  const m = Math.floor(sec / 60), s = sec % 60;
-  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-}
-
 function startTimer() {
   stopTimer();
   tick();
@@ -360,38 +376,15 @@ async function endRest(alert) {
   if (t) { t.textContent = fmtClock(rest); t.classList.remove('live'); }
   if (bar) bar.style.width = '0%';
   if (alert) {
-    flash('Descanso terminado. A por la siguiente serie.');
+    toast('Descanso terminado. A por la siguiente serie.');
+    flashCard(t && t.closest('.card'));
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    beep();
+    if (await getSetting('restSound', true)) beep();
   }
 }
 
-function beep() {
-  if (!audioCtx) return;
-  try {
-    [0, 0.25, 0.5].forEach((delay) => {
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = 'sine'; o.frequency.value = 880;
-      g.gain.value = 0.15;
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start(audioCtx.currentTime + delay);
-      o.stop(audioCtx.currentTime + delay + 0.15);
-    });
-  } catch (e) { /* sin sonido */ }
-}
-
-async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator && !wakeLock) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; });
-    }
-  } catch (e) { /* no disponible */ }
-}
-
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && view === 'train' && session) { requestWakeLock(); tick(); }
+  if (document.visibilityState === 'visible' && view === 'train' && session) { keepAwake(); tick(); }
 });
 
 // ---------- Terminar ----------
@@ -406,7 +399,7 @@ async function finishSession() {
   session = null;
   await setSetting('activeSession', null);
   stopTimer();
-  try { wakeLock && wakeLock.release(); } catch (e) { /* nada */ }
+  releaseAwake();
   view = 'done';
   showDone();
 }

@@ -1,6 +1,6 @@
 // Base de datos local (IndexedDB). Todo se guarda en el móvil, sin servidor.
 const DB_NAME = 'entrenador';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const APP_ID = 'entrenador-personal';
 
 // Almacenes (tablas):
@@ -9,13 +9,15 @@ const APP_ID = 'entrenador-personal';
 //  bodyweight peso corporal: { date, kg }
 //  schedule   calendario: { date, kind, note }  (entreno, movilidad, oficina, pádel...)
 //  sessions   sesiones terminadas: { id, day, variant, startedAt, finishedAt, setsDone, ids }
+//  mobility   rutinas de movilidad hechas: { id, date, routineId, minutes, finishedAt }
 //  (logs de entrenamiento: { id, sessionId, date, exerciseId, setIndex, weight, reps })
 const STORES = {
   settings: { keyPath: 'key' },
   logs: { keyPath: 'id', autoIncrement: true, indexes: [['date', 'date'], ['exerciseId', 'exerciseId']] },
   bodyweight: { keyPath: 'date' },
   schedule: { keyPath: 'date' },
-  sessions: { keyPath: 'id' }
+  sessions: { keyPath: 'id' },
+  mobility: { keyPath: 'id' }
 };
 
 let dbPromise;
