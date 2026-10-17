@@ -1,6 +1,6 @@
 // Base de datos local (IndexedDB). Todo se guarda en el móvil, sin servidor.
 const DB_NAME = 'entrenador';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const APP_ID = 'entrenador-personal';
 
 // Almacenes (tablas):
@@ -8,11 +8,14 @@ const APP_ID = 'entrenador-personal';
 //  logs       series registradas: { id, date, exerciseId, setIndex, weight, reps, rir }
 //  bodyweight peso corporal: { date, kg }
 //  schedule   calendario: { date, kind, note }  (entreno, movilidad, oficina, pádel...)
+//  sessions   sesiones terminadas: { id, day, variant, startedAt, finishedAt, setsDone, ids }
+//  (logs de entrenamiento: { id, sessionId, date, exerciseId, setIndex, weight, reps })
 const STORES = {
   settings: { keyPath: 'key' },
   logs: { keyPath: 'id', autoIncrement: true, indexes: [['date', 'date'], ['exerciseId', 'exerciseId']] },
   bodyweight: { keyPath: 'date' },
-  schedule: { keyPath: 'date' }
+  schedule: { keyPath: 'date' },
+  sessions: { keyPath: 'id' }
 };
 
 let dbPromise;
@@ -54,6 +57,18 @@ export async function put(store, value) {
 export async function getAll(store) {
   const db = await openDb();
   return wrap(db.transaction(store).objectStore(store).getAll());
+}
+
+export async function del(store, key) {
+  const db = await openDb();
+  const tx = db.transaction(store, 'readwrite');
+  tx.objectStore(store).delete(key);
+  await txDone(tx);
+}
+
+export async function getByIndex(store, index, value) {
+  const db = await openDb();
+  return wrap(db.transaction(store).objectStore(store).index(index).getAll(value));
 }
 
 export async function count(store) {

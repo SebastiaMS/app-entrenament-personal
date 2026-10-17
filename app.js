@@ -1,5 +1,6 @@
 import { count, exportBackup, getSetting, importBackup, requestPersistence, setSetting } from './db.js';
-import { EXERCISES, PROGRAM, nextMonday, otherOption, sessionFor, videoUrl, weekVariant } from './exercises.js';
+import { EXERCISES, PROGRAM, otherOption, sessionFor, videoUrl } from './exercises.js';
+import { programVariant, renderToday } from './train.js';
 
 const ICONS = {
   hoy: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
@@ -44,15 +45,6 @@ function go(id) {
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-async function programVariant() {
-  let start = await getSetting('programStart');
-  if (!start) {
-    start = nextMonday(new Date()).toISOString();
-    await setSetting('programStart', start);
-  }
-  return weekVariant(new Date(), new Date(start));
-}
 
 async function renderLibrary() {
   const thisWeek = await programVariant();
@@ -100,6 +92,7 @@ function render() {
   renderNav();
   const tab = TABS.find((t) => t.id === current);
   if (tab.id === 'ajustes') return libraryOpen ? renderLibrary() : renderSettings(tab);
+  if (tab.id === 'hoy') return renderToday(app, { immersive: (on) => { nav.style.display = on ? 'none' : ''; } });
   app.innerHTML = `
     <div class="head"><span class="eyebrow">${tab.eyebrow}</span><h1>${tab.title}</h1></div>
     <div class="placeholder"><strong>Próximamente</strong><span>${tab.soon}</span><span>Se construye en la ${tab.phase}.</span></div>`;
