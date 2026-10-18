@@ -1,6 +1,6 @@
 // Service worker: guarda la app en el móvil para que abra sin conexión.
 // Al cambiar archivos de la app, sube el número de VERSION para que se actualice.
-const VERSION = 'v12';
+const VERSION = 'v15';
 const CACHE = 'entrenador-' + VERSION;
 const SHELL = [
   './',
@@ -15,6 +15,7 @@ const SHELL = [
   'history.js',
   'week.js',
   'progress.js',
+  'nutrition.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

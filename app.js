@@ -3,6 +3,7 @@ import { EXERCISES, PROGRAM, otherOption, sessionFor, videoUrl } from './exercis
 import { programVariant, renderToday } from './train.js';
 import { renderHistory } from './history.js';
 import { renderWeek } from './week.js';
+import { renderNutrition } from './nutrition.js';
 
 const ICONS = {
   hoy: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
@@ -96,6 +97,7 @@ function render() {
   if (tab.id === 'ajustes') return libraryOpen ? renderLibrary() : renderSettings(tab);
   if (tab.id === 'historial') return renderHistory(app);
   if (tab.id === 'semana') return renderWeek(app);
+  if (tab.id === 'nutricion') return renderNutrition(app);
   if (tab.id === 'hoy') return renderToday(app, { immersive: (on) => { nav.style.display = on ? 'none' : ''; } });
   app.innerHTML = `
     <div class="head"><span class="eyebrow">${tab.eyebrow}</span><h1>${tab.title}</h1></div>
