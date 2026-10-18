@@ -1,6 +1,7 @@
 // Nutrición: guía orientativa de calorías y proteína para ganar masa muscular.
 import { del, getAll, getSetting, put, setSetting } from './db.js';
 import { esc, localDate, toast } from './util.js';
+import { syncFromFitbit } from './fitbit.js';
 
 const DEFAULTS = { height: 183, age: 25, factor: 1.4, surplus: 0.10, adj: 0, adjDate: null, sex: 'm', measured: null };
 const FACTORS = [[1.3, 'Muy sedentario'], [1.4, 'Sentado + 3 gym'], [1.5, 'Bastante activo']];
@@ -69,6 +70,8 @@ export async function renderNutrition(container) {
   const sug = suggestAdjust(p, tr);
   const today = localDate();
   const todayRow = rows.find((r) => r.date === today);
+  const fb = await getSetting('fitbit');
+  const clientId = await getSetting('googleClientId', '');
   const feel = await getSetting('nutFeel');
   const feelRecent = feel && dayNum(today) - dayNum(feel.date) <= 7 ? feel : null;
   const advice = feelAdvice(feelRecent, tr);
@@ -98,6 +101,13 @@ export async function renderNutrition(container) {
       </div>
       ${tr ? `<p><strong>Media 7 días: ${fmt(tr.avg)} kg</strong>${tr.rate !== null ? ` · ${tr.rate >= 0 ? '+' : '−'}${fmt(Math.abs(tr.rate), 2)} kg frente a la semana anterior` : ' · necesito 2 semanas de datos para ver la tendencia'}</p>` : '<p>Pésate varias veces por semana (mejor en ayunas) y la app calculará tu media semanal.</p>'}
       ${rows.length ? `<div class="list" style="gap:0">${rows.slice(-6).reverse().map((r) => `<div class="item" style="min-height:40px;font-size:15px"><span>${new Date(r.date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</span><span>${fmt(r.kg)} kg</span></div>`).join('')}</div>` : ''}
+    </div>
+    <div class="card" id="nut-fitbit">
+      <span class="eyebrow">Fitbit Air · gasto real</span>
+      ${fb ? `<p style="color:var(--text);font-size:15px"><strong>${fb.avg} kcal/día</strong> de media en ${fb.days} día${fb.days === 1 ? '' : 's'} completo${fb.days === 1 ? '' : 's'}, leído el ${new Date(fb.date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}.${fb.days < 7 ? ' Aún es provisional: se afina con más días.' : ''}</p>` : '<p>Lee tu gasto medio directamente de la Fitbit, sin escribirlo a mano. Hace falta conexión.</p>'}
+      <label class="inp"><input id="g-client" placeholder="ID de cliente de Google" value="${esc(clientId)}" aria-label="ID de cliente de Google" style="text-align:left;font-size:13px"></label>
+      <button class="btn primary" id="fb-sync" style="flex:none;min-height:48px">Leer gasto de la Fitbit</button>
+      <div class="msg" id="fb-msg" role="status"></div>
     </div>
     ${sug ? `<div class="card" id="nut-sug"><span class="eyebrow">Ajuste sugerido</span><p style="color:var(--text);font-size:15px">${esc(sug.text)}</p>
       ${sug.delta ? '<button class="btn" id="adj-apply" style="flex:none;min-height:48px">Aplicar ' + (sug.delta > 0 ? '+' : '') + sug.delta + ' kcal</button>' : '<button class="btn" id="adj-ok" style="flex:none;min-height:48px">Entendido</button>'}</div>` : ''}
@@ -149,6 +159,22 @@ export async function renderNutrition(container) {
     await setSetting('nutFeel', { energy: cur.energy, hunger: cur.hunger, [k]: v, date: today });
     renderNutrition(container);
   }));
+  container.querySelector('#fb-sync').addEventListener('click', async () => {
+    const msg = container.querySelector('#fb-msg');
+    const id = container.querySelector('#g-client').value.trim();
+    if (!id.includes('.apps.googleusercontent.com')) { msg.textContent = 'Pega el ID de cliente de Google Cloud (termina en .apps.googleusercontent.com).'; return; }
+    await setSetting('googleClientId', id);
+    msg.textContent = 'Conectando con Google…';
+    try {
+      const r = await syncFromFitbit(id);
+      if (!r) { msg.textContent = 'No hay días completos todavía (hoy no cuenta). Prueba mañana.'; return; }
+      await setSetting('fitbit', { date: today, avg: r.avg, days: r.days });
+      await setSetting('nutrition', { ...p, measured: r.avg });
+      renderNutrition(container);
+    } catch (e) {
+      msg.textContent = 'No se pudo leer: ' + e.message;
+    }
+  });
   const apply = container.querySelector('#adj-apply');
   if (apply) apply.addEventListener('click', () => save({ adj: p.adj + sug.delta, adjDate: today }));
   const ok = container.querySelector('#adj-ok');
