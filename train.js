@@ -2,6 +2,7 @@
 import { del, getAll, getByIndex, getSetting, put, setSetting } from './db.js';
 import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } from './exercises.js';
 import { beep, esc, flashCard, fmtClock, keepAwake, localDate, releaseAwake, svg, toast, unlockAudio } from './util.js';
+import { suggestion } from './progress.js';
 import { KINDS, getMark, openDaySheet, weekData, weekStripHtml } from './week.js';
 import { ROUTINES, doneToday, favorites, routineMinutes, startMobility, suggestedRoutine, toggleFavorite } from './mobility.js';
 
@@ -227,12 +228,15 @@ async function startSession(day, light = false) {
   const variant = await programVariant();
   const items = sessionFor(day, variant);
   const sets = {};
-  session = { id: Date.now(), day, variant, light, startedAt: new Date().toISOString(), idx: 0, ids: items.map((e) => e.id), sets, restEnd: null, restTotal: 0 };
+  const targets = {};
+  session = { id: Date.now(), day, variant, light, targets, startedAt: new Date().toISOString(), idx: 0, ids: items.map((e) => e.id), sets, restEnd: null, restTotal: 0 };
   for (const ex of items) {
     const last = await lastTime(ex.id);
+    const sug = await suggestion(ex.id, ex);
+    if (sug) targets[ex.id] = sug;
     sets[ex.id] = Array.from({ length: lightSets(ex, light) }, (_, i) => {
       const l = last && (last[i] || last[last.length - 1]);
-      return { w: l ? l.weight : '', r: l ? l.reps : '', done: false };
+      return { w: sug && ex.carga !== 'peso-corporal' ? sug.weight : l ? l.weight : '', r: l ? l.reps : '', done: false };
     });
   }
   await persist();
@@ -279,6 +283,7 @@ async function showTrain() {
       <button class="mini" id="how">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.2-2.5 3.9"/><path d="M12 17.4v.1"/>', 18, 2)}Cómo se hace</button>
       <a class="mini" href="${videoUrl(id)}" target="_blank" rel="noopener">${svg('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10.5 9.5l4 2.5-4 2.5z"/>', 18, 2)}Ver vídeo</a>
     </div>
+    ${(session.targets || {})[id] ? `<div class="lastline target ${session.targets[id].kind}">${svg('<path d="M12 19V6M6 11l6-6 6 6"/>', 16, 2.4)}<span><strong>${esc(session.targets[id].text)}</strong></span></div>` : ''}
     ${last ? `<div class="lastline">${svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>', 16, 2)}<span>La última vez: <strong>${esc(last)}</strong></span></div>` : '<div class="lastline muted">Primera vez con este ejercicio: empieza con un peso que te deje 3-4 repeticiones en reserva.</div>'}
     <div style="display:flex;flex-direction:column;gap:10px" id="sets">
       ${sets.map((s, i) => `
@@ -446,7 +451,12 @@ async function finishSession() {
   const rec = { id: session.id, day: session.day, variant: session.variant, startedAt: session.startedAt, finishedAt, setsDone, ids: session.ids };
   await put('sessions', rec);
   await setSetting('lastDay', session.day);
-  summary = { ...rec, minutes: Math.max(1, Math.round((new Date(finishedAt) - new Date(session.startedAt)) / 60000)) };
+  const ups = [];
+  for (const id of rec.ids) {
+    const sg = await suggestion(id, EXERCISES[id]);
+    if (sg && sg.kind === 'up') ups.push({ name: EXERCISES[id].name, text: sg.text });
+  }
+  summary = { ...rec, ups, minutes: Math.max(1, Math.round((new Date(finishedAt) - new Date(session.startedAt)) / 60000)) };
   session = null;
   await setSetting('activeSession', null);
   stopTimer();
@@ -467,6 +477,7 @@ function showDone() {
       <div class="item"><span>Series hechas</span><span>${summary.setsDone}</span></div>
       <div class="item"><span>Ejercicios</span><span>${summary.ids.length}</span></div>
     </div>
+    ${summary.ups && summary.ups.length ? `<div class="card"><span class="eyebrow">Próxima vez subes</span><div class="list" style="gap:0">${summary.ups.map((u) => `<div class="item" style="min-height:44px;font-size:15px"><span>${esc(u.name)}</span></div><div class="muted small" style="padding:0 0 8px">${esc(u.text)}</div>`).join('')}</div></div>` : ''}
     <div style="flex-grow:1"></div>
     <button class="btn primary" id="back-today" style="flex:none">Volver a Hoy</button>`;
   document.getElementById('back-today').addEventListener('click', () => { summary = null; view = 'today'; showToday(); });

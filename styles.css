@@ -318,3 +318,8 @@ details.routines .rfav[aria-pressed="true"] { color: var(--ochre); border-color:
 .wleg { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .wleg span { display: inline-flex; align-items: center; gap: 6px; }
 .daykind[aria-pressed="true"] { background: var(--tint); border-color: var(--ochre); }
+
+/* Progresión: objetivo de hoy */
+.lastline.target { background: var(--green-tint); border-color: #B9D7C1; color: var(--text); }
+.lastline.target.down { background: #FBEDEA; border-color: #E8B8B2; }
+.lastline.target.hold { background: var(--tint); border-color: #E2C98F; }
