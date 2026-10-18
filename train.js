@@ -3,7 +3,7 @@ import { del, getAll, getByIndex, getSetting, put, setSetting } from './db.js';
 import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } from './exercises.js';
 import { beep, esc, flashCard, fmtClock, keepAwake, localDate, releaseAwake, svg, toast, unlockAudio } from './util.js';
 import { suggestion } from './progress.js';
-import { KINDS, getMark, openDaySheet, weekData, weekStripHtml } from './week.js';
+import { KINDS, getMark, openDaySheet, weekData, weekStripHtml, weekTip } from './week.js';
 import { ROUTINES, doneToday, favorites, routineMinutes, startMobility, suggestedRoutine, toggleFavorite } from './mobility.js';
 
 const DAYS = ['push', 'pull', 'legs'];
@@ -163,7 +163,7 @@ async function showToday() {
 
   host.innerHTML = `
     <div class="head"><span class="eyebrow">${esc(dateTxt)}</span><h1>Hoy</h1></div>
-    ${weekStripHtml(w)}
+    ${weekStripHtml(w, weekTip(w, sessions, suggested))}
     ${mobCard}
     ${gate}
     ${gate ? '' : `<div class="card">

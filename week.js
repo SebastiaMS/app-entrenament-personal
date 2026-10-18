@@ -58,7 +58,27 @@ export async function weekData(ref = new Date()) {
   };
 }
 
-export function weekStripHtml(w) {
+// Consejo del día (solo orientativo): cardio suave y pádel según lo que llevas.
+// sessions: sesiones terminadas; nextDay: día del ciclo que toca (push|pull|legs)
+export function weekTip(w, sessions, nextDay) {
+  const today = w.days.find((d) => d.isToday);
+  if (!today) return null;
+  if (today.kind === 'oficina') return 'Hoy es oficina: buen día para movilidad y cardio suave (caminar, bici o correr), sin pesas.';
+  if (today.kind === 'padel' || today.kind === 'descanso') return null;
+  const done = sessions.filter((s) => s.finishedAt);
+  const lastLegs = done.filter((s) => s.day === 'legs').sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt))[0];
+  const hoursSinceLegs = lastLegs ? (Date.now() - new Date(lastLegs.finishedAt)) / 3600000 : Infinity;
+  const tIdx = w.days.indexOf(today);
+  const tomorrow = tIdx < 6 ? w.days[tIdx + 1] : null;
+  const padelThisWeek = w.days.some((d) => d.kind === 'padel');
+  if (!today.gym && hoursSinceLegs < 48) return 'Las piernas aún están cargadas de Legs: mejor no jugar pádel hoy; cardio suave sí.';
+  if (!today.gym && !padelThisWeek && w.gymCount >= 2 && nextDay !== 'legs' && hoursSinceLegs >= 48) return 'Hoy encaja un pádel si te apetece: llevas ' + w.gymCount + ' sesiones esta semana y las piernas ya descansaron. Márcalo arriba para que la app lo tenga en cuenta.';
+  if (!today.gym && w.gymCount >= 3) return 'Semana de gimnasio completa. Hoy: movilidad y cardio suave si quieres moverte.';
+  if (today.gym && tomorrow && tomorrow.kind === 'padel') return 'Mañana tienes pádel: hoy descansa bien y evita machacar las piernas.';
+  return null;
+}
+
+export function weekStripHtml(w, tip) {
   const cells = w.days.map((d) => {
     const dots = [
       d.gym ? '<i class="wd gym" title="Gimnasio"></i>' : '',
@@ -80,6 +100,7 @@ export function weekStripHtml(w) {
       </div>
       <div class="wstrip">${cells}</div>
       <div class="wleg"><span><i class="wd gym"></i>Gimnasio ${w.gymCount}</span><span><i class="wd mob"></i>${esc(mobTxt)}</span></div>
+      ${tip ? `<div class="lastline" id="week-tip" style="align-items:flex-start"><span>${esc(tip)}</span></div>` : ''}
     </div>`;
 }
 
