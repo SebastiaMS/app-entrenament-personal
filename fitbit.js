@@ -20,9 +20,17 @@ function loadGis() {
   return gisPromise;
 }
 
-export async function getToken(clientId) {
-  await loadGis();
+// Carga el script de Google con antelación: la ventana de inicio de sesión solo se puede abrir
+// directamente en el toque del botón, sin esperas antes (si no, iOS la bloquea).
+export function preloadGis() {
+  return loadGis().catch(() => {});
+}
+
+export function getToken(clientId) {
   return new Promise((resolve, reject) => {
+    if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) {
+      return reject(new Error('El inicio de sesión de Google aún no ha cargado. Espera un segundo y vuelve a pulsar (necesita conexión).'));
+    }
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: SCOPE,
@@ -69,7 +77,8 @@ export function summarize(points, now = new Date()) {
 }
 
 export async function syncFromFitbit(clientId) {
-  const token = await getToken(clientId);
+  const tokenPromise = getToken(clientId); // sin ningún await antes: debe abrirse en el toque del botón
+  const token = await tokenPromise;
   const points = await fetchCalories(token);
   return summarize(points);
 }

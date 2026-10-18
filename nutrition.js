@@ -1,7 +1,7 @@
 // Nutrición: guía orientativa de calorías y proteína para ganar masa muscular.
 import { del, getAll, getSetting, put, setSetting } from './db.js';
 import { esc, localDate, toast } from './util.js';
-import { syncFromFitbit } from './fitbit.js';
+import { preloadGis, syncFromFitbit } from './fitbit.js';
 
 const DEFAULTS = { height: 183, age: 25, factor: 1.4, surplus: 0.10, adj: 0, adjDate: null, sex: 'm', measured: null };
 const FACTORS = [[1.3, 'Muy sedentario'], [1.4, 'Sentado + 3 gym'], [1.5, 'Bastante activo']];
@@ -159,14 +159,17 @@ export async function renderNutrition(container) {
     await setSetting('nutFeel', { energy: cur.energy, hunger: cur.hunger, [k]: v, date: today });
     renderNutrition(container);
   }));
+  preloadGis();
   container.querySelector('#fb-sync').addEventListener('click', async () => {
     const msg = container.querySelector('#fb-msg');
     const id = container.querySelector('#g-client').value.trim();
     if (!id.includes('.apps.googleusercontent.com')) { msg.textContent = 'Pega el ID de cliente de Google Cloud (termina en .apps.googleusercontent.com).'; return; }
-    await setSetting('googleClientId', id);
     msg.textContent = 'Conectando con Google…';
+    const sync = syncFromFitbit(id); // se lanza ya, dentro del toque, para que la ventana de Google no se bloquee
+    sync.catch(() => {});
     try {
-      const r = await syncFromFitbit(id);
+      setSetting('googleClientId', id);
+      const r = await sync;
       if (!r) { msg.textContent = 'No hay días completos todavía (hoy no cuenta). Prueba mañana.'; return; }
       await setSetting('fitbit', { date: today, avg: r.avg, days: r.days });
       await setSetting('nutrition', { ...p, measured: r.avg });
