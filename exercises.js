@@ -36,7 +36,7 @@ export const EXERCISES = {
     cues: ['De rodillas, con la cuerda junto a la cabeza.', 'Enrolla el tronco llevando los codos hacia las rodillas.', 'Mueve la columna, no la cadera.', 'Vuelve despacio sin perder la tensión.'] },
 
   // ---------- PULL ----------
-  'jalon-pecho': { video: 'https://www.youtube.com/watch?v=k9R2YPcuWbE', name: 'Jalón al pecho', muscle: 'Espalda (dorsal)', equip: 'Polea de jalón', carga: 'polea', sets: 3, reps: [8, 12],
+  'jalon-pecho': { video: 'https://www.youtube.com/watch?v=3eYSv1nsiIU', name: 'Jalón al pecho', muscle: 'Espalda (dorsal)', equip: 'Polea de jalón', carga: 'polea', sets: 3, reps: [8, 12],
     cues: ['Agarre algo más ancho que los hombros y muslos bien sujetos.', 'Tira de la barra hacia la parte alta del pecho llevando los codos hacia abajo.', 'Torso ligeramente inclinado hacia atrás, sin balancearte.', 'Sube despacio hasta estirar los brazos.'] },
   'jalon-convergente': { video: 'https://www.youtube.com/watch?v=4UBCW3f9Vig', name: 'Jalón convergente', muscle: 'Espalda (dorsal)', equip: 'Máquina de jalón convergente', carga: 'maquina', sets: 3, reps: [8, 12],
     cues: ['Ajusta el asiento para agarrar las asas con los brazos casi estirados.', 'Tira llevando los codos hacia las costillas.', 'Pecho alto y hombros lejos de las orejas.', 'Vuelve controlado hasta estirar del todo.'] },
@@ -56,13 +56,13 @@ export const EXERCISES = {
     cues: ['Axilas apoyadas en el borde del pad y brazos apoyados.', 'Sube sin levantar los codos del pad.', 'Baja despacio hasta estirar casi del todo, sin dejarte caer.', 'Empieza ligero para proteger el codo al estirar.'] },
   'curl-alterno-mancuernas': { video: 'https://www.youtube.com/watch?v=b-DeZccsPSY', name: 'Curl alterno con mancuernas', muscle: 'Bíceps', equip: 'Mancuernas', carga: 'mancuerna', sets: 3, reps: [8, 12],
     cues: ['De pie o sentado, con la espalda recta.', 'Sube una mancuerna girando la palma hacia arriba.', 'Codo pegado al costado, sin balancear el cuerpo.', 'Baja controlado antes de subir la otra.'] },
-  'curl-martillo': { video: 'https://www.youtube.com/watch?v=mPvlpDWIoDA', name: 'Curl martillo', muscle: 'Bíceps y braquial', equip: 'Mancuernas', carga: 'mancuerna', sets: 3, reps: [8, 12],
+  'curl-martillo': { video: 'https://www.youtube.com/watch?v=RHdacbwKbTo', name: 'Curl martillo', muscle: 'Bíceps y braquial', equip: 'Mancuernas', carga: 'mancuerna', sets: 3, reps: [8, 12],
     cues: ['Palmas mirando hacia dentro durante todo el movimiento.', 'Sube sin mover el codo hacia delante.', 'Evita balancearte para subir el peso.', 'Baja despacio hasta estirar el brazo.'] },
   'curl-polea': { video: 'https://www.youtube.com/watch?v=7Jc4jHxax60', name: 'Curl en polea', muscle: 'Bíceps', equip: 'Polea baja', carga: 'polea', sets: 3, reps: [10, 15],
     cues: ['Polea baja con barra recta o cuerda.', 'Codos pegados a los costados y quietos.', 'Sube hasta contraer el bíceps, sin echar el cuerpo hacia atrás.', 'Baja despacio manteniendo tensión.'] },
   'curl-muneca-barra': { video: 'https://www.youtube.com/watch?v=s5lhlt5FeP4', name: 'Curl de muñeca con barra', muscle: 'Antebrazo', equip: 'Banco y barra', carga: 'barra', sets: 3, reps: [12, 20],
     cues: ['Antebrazos apoyados sobre un banco o los muslos, palmas hacia arriba.', 'Deja que la barra baje hasta los dedos y sube enrollando la muñeca.', 'Mueve solo la muñeca, no el antebrazo.', 'Peso ligero y muchas repeticiones controladas.'] },
-  'curl-inverso': { video: 'https://www.youtube.com/watch?v=uQ_eVSQtoog', name: 'Curl inverso', muscle: 'Antebrazo y braquial', equip: 'Barra Z o mancuernas', carga: 'barra', sets: 3, reps: [10, 15],
+  'curl-inverso': { video: 'https://www.youtube.com/watch?v=10AFVfSUzsU', name: 'Curl inverso', muscle: 'Antebrazo y braquial', equip: 'Barra Z o mancuernas', carga: 'barra', sets: 3, reps: [10, 15],
     cues: ['Agarre con las palmas hacia abajo, a la anchura de los hombros.', 'Sube sin mover los codos de los costados.', 'Mantén las muñecas rectas.', 'Baja despacio; el peso será menor que en un curl normal.'] },
 
   // ---------- LEGS ----------
@@ -76,7 +76,7 @@ export const EXERCISES = {
     cues: ['Rodillas alineadas con el eje de giro de la máquina.', 'Estira las piernas sin balancear el cuerpo.', 'Aguanta un instante arriba contrayendo el muslo.', 'Baja despacio, sin dejar caer el peso.'] },
   'hip-thrust-maquina': { video: 'https://www.youtube.com/watch?v=4ksQt-cEfng', name: 'Hip thrust en máquina', muscle: 'Glúteo', equip: 'Máquina de hip thrust de discos (tipo DHZ Evost II)', carga: 'discos', sets: 3, reps: [8, 12], tecnica: true,
     cues: ['Espalda apoyada en el respaldo y rodillo sobre la cadera, no sobre el abdomen.', 'Pies a la anchura de los hombros, con las espinillas casi verticales arriba.', 'Empuja con los talones hasta que la cadera quede alineada con el tronco.', 'Aprieta el glúteo arriba sin arquear la zona lumbar y baja controlado.'] },
-  'peso-muerto-rumano-mancuernas': { video: 'https://www.youtube.com/watch?v=9j_L1KgpK8Y', name: 'Peso muerto rumano con mancuernas', muscle: 'Isquios y glúteo', equip: 'Mancuernas', carga: 'mancuerna', sets: 3, reps: [8, 12], tecnica: true,
+  'peso-muerto-rumano-mancuernas': { video: 'https://www.youtube.com/watch?v=Y8jFtqIoyyU', name: 'Peso muerto rumano con mancuernas', muscle: 'Isquios y glúteo', equip: 'Mancuernas', carga: 'mancuerna', sets: 3, reps: [8, 12], tecnica: true,
     cues: ['Rodillas ligeramente flexionadas y mancuernas pegadas a las piernas.', 'Lleva la cadera hacia atrás como si cerraras una puerta con el glúteo.', 'Espalda recta todo el tiempo; baja hasta notar estiramiento en los isquios.', 'Sube empujando la cadera hacia delante. Empieza con poco peso.'] },
   'zancadas-mancuernas': { video: 'https://www.youtube.com/watch?v=5WrNbdXNHe8', name: 'Zancadas con mancuernas', muscle: 'Cuádriceps y glúteo', equip: 'Mancuernas', carga: 'mancuerna', sets: 3, reps: [8, 12], tecnica: true,
     cues: ['Da un paso largo y baja la rodilla de atrás hacia el suelo.', 'Torso erguido y rodilla delantera alineada con el pie.', 'Empuja con el pie de delante para volver.', 'Si pierdes el equilibrio, empieza sin peso o con apoyo.'] },
