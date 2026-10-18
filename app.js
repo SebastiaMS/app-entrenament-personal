@@ -148,7 +148,7 @@ async function renderSettings(tab) {
       <div class="item"><span>Series guardadas</span><span>${logs}</span></div>
       <div class="item"><span>Pesos corporales</span><span>${weights}</span></div>
       <div class="item"><span>Almacenamiento protegido</span><span>${persisted === null ? 'No disponible' : persisted ? 'Sí' : 'No'}</span></div>
-      <div class="item"><span>Versión</span><span>0.1 · base técnica</span></div>
+      <div class="item"><span>Versión</span><span>1.0 · Fases 0-6</span></div>
     </div>`;
   document.getElementById('toggle-sound').addEventListener('click', async () => {
     await setSetting('restSound', !restSound);

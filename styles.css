@@ -19,7 +19,7 @@
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
 
 body {
-  font-family: 'Figtree', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -323,3 +323,9 @@ details.routines .rfav[aria-pressed="true"] { color: var(--ochre); border-color:
 .lastline.target { background: var(--green-tint); border-color: #B9D7C1; color: var(--text); }
 .lastline.target.down { background: #FBEDEA; border-color: #E8B8B2; }
 .lastline.target.hold { background: var(--tint); border-color: #E2C98F; }
+
+/* Respeta "reducir movimiento" del sistema */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+html { -webkit-text-size-adjust: 100%; }

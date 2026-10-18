@@ -2,7 +2,9 @@
 
 App móvil (PWA) para registrar entrenamientos, ver tu progresión y seguir una guía basada en evidencia para ganar masa muscular. Funciona sin conexión: los datos se guardan en el propio móvil.
 
-Estado: Fase 2 (base técnica). Las pantallas de entrenamiento, historial, calendario y nutrición se construyen en las fases siguientes.
+Estado: versión 1.0 (fases 0-6 completas). Incluye sesiones Push/Pull/Legs con rotación semanal A/B, temporizador de descanso, progresión de cargas por repeticiones, movilidad diaria guiada, historial con gráficas, calendario semanal (oficina, pádel, descanso) y guía de nutrición. Pendiente: integración con la Fitbit Air (fase 8).
+
+Los vídeos de técnica enlazan a YouTube y necesitan conexión; todo lo demás funciona sin ella.
 
 ## Instalar en iPhone
 1. Abre la dirección de la app en Safari.
