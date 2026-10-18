@@ -148,8 +148,9 @@ async function renderSettings(tab) {
       <div class="item"><span>Series guardadas</span><span>${logs}</span></div>
       <div class="item"><span>Pesos corporales</span><span>${weights}</span></div>
       <div class="item"><span>Almacenamiento protegido</span><span>${persisted === null ? 'No disponible' : persisted ? 'Sí' : 'No'}</span></div>
-      <div class="item"><span>Versión</span><span>1.0 · Fases 0-6</span></div>
+      <div class="item"><span>Versión</span><span id="app-ver">1.0</span></div>
     </div>`;
+  if (window.caches) caches.keys().then((ks) => { const k = ks.find((x) => x.startsWith('entrenador-')); const el = document.getElementById('app-ver'); if (el && k) el.textContent = '1.0 · ' + k.replace('entrenador-', ''); }).catch(() => {});
   document.getElementById('toggle-sound').addEventListener('click', async () => {
     await setSetting('restSound', !restSound);
     renderSettings(tab);
