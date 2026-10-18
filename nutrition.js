@@ -2,7 +2,7 @@
 import { del, getAll, getSetting, put, setSetting } from './db.js';
 import { esc, localDate, toast } from './util.js';
 
-const DEFAULTS = { height: 183, age: 25, factor: 1.4, surplus: 0.10, adj: 0, adjDate: null, sex: 'm' };
+const DEFAULTS = { height: 183, age: 25, factor: 1.4, surplus: 0.10, adj: 0, adjDate: null, sex: 'm', measured: null };
 const FACTORS = [[1.3, 'Muy sedentario'], [1.4, 'Sentado + 3 gym'], [1.5, 'Bastante activo']];
 const fmt = (n, d = 1) => (Math.round(n * 10 ** d) / 10 ** d).toFixed(d).replace('.', ',');
 const FEEL = {
@@ -28,7 +28,7 @@ export async function loadProfile() {
 // Metabolismo basal (Mifflin-St Jeor) y objetivo diario.
 export function targets(p, kg) {
   const bmr = 10 * kg + 6.25 * p.height - 5 * p.age + (p.sex === 'f' ? -161 : 5);
-  const tdee = bmr * p.factor;
+  const tdee = p.measured > 0 ? p.measured : bmr * p.factor;
   const kcal = Math.round((tdee * (1 + p.surplus) + p.adj) / 10) * 10;
   const protein = Math.round((1.8 * kg) / 5) * 5;
   const fat = Math.round((1 * kg) / 5) * 5;
@@ -86,7 +86,7 @@ export async function renderNutrition(container) {
         <div class="item" style="min-height:44px;font-size:15px"><span>Proteína (rango)</span><span>${t.proteinMin}-${t.proteinMax} g</span></div>
         <div class="item" style="min-height:44px;font-size:15px"><span>Grasas (aprox.)</span><span>${t.fat} g</span></div>
         <div class="item" style="min-height:44px;font-size:15px"><span>Carbohidratos (el resto)</span><span>${t.carbs} g</span></div>
-        <div class="item" style="min-height:44px;font-size:15px"><span>Tu gasto estimado</span><span>${t.tdee} kcal</span></div>
+        <div class="item" style="min-height:44px;font-size:15px"><span>${p.measured > 0 ? 'Tu gasto (media Fitbit)' : 'Tu gasto estimado'}</span><span>${t.tdee} kcal</span></div>
       </div>
       <p>Cifras orientativas, no un plan médico. Se calculan con tu peso (${fmt(kg)} kg${rows.length ? '' : ', aún sin pesarte'}), altura y actividad, y se ajustan con tu tendencia de peso.</p>
     </div>
@@ -128,6 +128,8 @@ export async function renderNutrition(container) {
           <label class="inp" style="flex:1"><input id="p-h" inputmode="numeric" value="${p.height}" aria-label="Altura"><span>cm</span></label>
           <label class="inp" style="flex:1"><input id="p-a" inputmode="numeric" value="${p.age}" aria-label="Edad"><span>años</span></label>
         </div>
+        <label class="inp"><input id="p-m" inputmode="numeric" placeholder="Opcional, ej. 2600" value="${p.measured || ''}" aria-label="Gasto medio diario de la Fitbit"><span>kcal/día</span></label>
+        <span class="muted small">Gasto medio diario de tu Fitbit (mira el promedio de la semana, no un solo día). Si lo rellenas, la app lo usa en lugar de la fórmula; déjalo vacío para volver a la fórmula. Las pulseras se equivocan un 10-20 %, por eso el ajuste final sigue saliendo de tu peso.</span>
         <div class="chips" style="flex-wrap:wrap">${FACTORS.map(([f, l]) => `<button class="chip" data-f="${f}" aria-pressed="${p.factor === f}">${l}</button>`).join('')}</div>
         <span class="muted small">Calorías extra añadidas por ajustes: ${p.adj > 0 ? '+' : ''}${p.adj} kcal. Excedente base: 10 % sobre tu gasto.</span>
         <button class="btn" id="p-save" style="flex:none;min-height:48px">Guardar datos</button>
@@ -160,6 +162,9 @@ export async function renderNutrition(container) {
     const h = parseNum(container.querySelector('#p-h').value);
     const a = parseNum(container.querySelector('#p-a').value);
     if (!(h >= 120 && h <= 230) || !(a >= 14 && a <= 90)) return toast('Revisa la altura (cm) y la edad');
-    save({ height: h, age: a, factor });
+    const mRaw = container.querySelector('#p-m').value.trim();
+    const m = mRaw ? parseNum(mRaw) : null;
+    if (mRaw && !(m >= 1200 && m <= 6000)) return toast('El gasto diario debe estar entre 1200 y 6000 kcal');
+    save({ height: h, age: a, factor, measured: m });
   });
 }
