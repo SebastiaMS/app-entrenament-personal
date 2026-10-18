@@ -2,6 +2,7 @@ import { count, exportBackup, getSetting, importBackup, requestPersistence, setS
 import { EXERCISES, PROGRAM, otherOption, sessionFor, videoUrl } from './exercises.js';
 import { programVariant, renderToday } from './train.js';
 import { renderHistory } from './history.js';
+import { renderWeek } from './week.js';
 
 const ICONS = {
   hoy: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
@@ -94,6 +95,7 @@ function render() {
   const tab = TABS.find((t) => t.id === current);
   if (tab.id === 'ajustes') return libraryOpen ? renderLibrary() : renderSettings(tab);
   if (tab.id === 'historial') return renderHistory(app);
+  if (tab.id === 'semana') return renderWeek(app);
   if (tab.id === 'hoy') return renderToday(app, { immersive: (on) => { nav.style.display = on ? 'none' : ''; } });
   app.innerHTML = `
     <div class="head"><span class="eyebrow">${tab.eyebrow}</span><h1>${tab.title}</h1></div>

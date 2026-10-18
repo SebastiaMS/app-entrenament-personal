@@ -2,6 +2,7 @@
 import { del, getAll, getByIndex, getSetting, put, setSetting } from './db.js';
 import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } from './exercises.js';
 import { beep, esc, flashCard, fmtClock, keepAwake, localDate, releaseAwake, svg, toast, unlockAudio } from './util.js';
+import { KINDS, getMark, openDaySheet, weekData, weekStripHtml } from './week.js';
 import { ROUTINES, doneToday, favorites, routineMinutes, startMobility, suggestedRoutine, toggleFavorite } from './mobility.js';
 
 const DAYS = ['push', 'pull', 'legs'];
@@ -37,6 +38,16 @@ let timerId = null;
 let resumed = false;
 let pickedRoutine = null;  // rutina de movilidad elegida en Hoy
 let routinesOpen = false;  // lista de rutinas desplegada
+
+// Decisión de hoy cuando hay marca (pádel, oficina, descanso): { date, choice }
+async function todayChoice() {
+  const c = await getSetting('todayChoice');
+  return c && c.date === localDate() ? c.choice : null;
+}
+async function chooseToday(choice) {
+  await setSetting('todayChoice', { date: localDate(), choice });
+}
+const lightSets = (e, light) => (light ? Math.max(2, e.sets - 1) : e.sets);
 
 function persist() {
   return setSetting('activeSession', session);
@@ -83,6 +94,13 @@ async function showToday() {
   const items = session ? session.ids.map((id) => ({ id, ...EXERCISES[id] })) : sessionFor(day, variant);
   const sessions = await getAll('sessions');
   const lastSession = sessions.sort((a, b) => b.id - a.id)[0];
+  const w = await weekData();
+  const tIdx = w.days.findIndex((d) => d.isToday);
+  const kind = w.days[tIdx].kind;
+  const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+  const tomorrowKind = await getMark(localDate(tmr));
+  const choice = await todayChoice();
+  const light = !session && choice === 'light';
   const dateTxt = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
 
   const done = session ? Object.values(session.sets).flat().filter((s) => s.done).length : 0;
@@ -115,28 +133,58 @@ async function showToday() {
       </details>
     </div>`;
 
+  // Tarjeta de aviso cuando hoy tiene marca y todavía no se ha decidido qué hacer con el gym
+  let gate = '';
+  if (!session) {
+    if (kind === 'padel' && !choice) {
+      gate = `<div class="card" id="gate">
+        <span class="eyebrow">Hoy: pádel</span>
+        <span style="font-size:20px;font-weight:800;line-height:1.2">¿Qué hacemos con ${PROGRAM[day].name}?</span>
+        <p>${day === 'legs' ? 'Hoy toca Legs y el pádel castiga mucho las piernas: lo mejor es dejarlo para otro día.' : 'Un partido intenso cansa; puedes dejar la sesión o hacerla más corta.'}</p>
+        <button class="btn" data-choice="skip" style="flex:none">Dejarla para otro día</button>
+        <button class="btn" data-choice="light" style="flex:none">Versión ligera (una serie menos)</button>
+        <button class="btn" data-choice="normal" style="flex:none">Entrenar normal</button>
+      </div>`;
+    } else if (kind === 'padel' && choice === 'skip') {
+      gate = `<div class="card" id="gate"><span class="eyebrow">Hoy: pádel</span>
+        <span style="font-size:20px;font-weight:800;line-height:1.2">Hoy solo pádel</span>
+        <p>${PROGRAM[day].name} queda para el siguiente día de gimnasio; el ciclo no se descuadra.</p>
+        <button class="btn" data-choice="" style="flex:none;min-height:48px">Cambiar de idea</button></div>`;
+    } else if ((kind === 'oficina' || kind === 'descanso') && choice !== 'train') {
+      gate = `<div class="card" id="gate"><span class="eyebrow">Hoy: ${KINDS[kind].label.toLowerCase()}</span>
+        <span style="font-size:20px;font-weight:800;line-height:1.2">${kind === 'oficina' ? 'Hoy no toca levantar pesado' : 'Hoy descansas'}</span>
+        <p>${kind === 'oficina' ? 'En oficina vale movilidad y cardio suave (caminar, correr o bici). El ciclo sigue donde estaba.' : 'Día libre. El ciclo sigue donde estaba.'}</p>
+        <button class="btn" data-choice="train" style="flex:none;min-height:48px">Entrenar igualmente</button></div>`;
+    }
+  }
+  const tomorrowNote = !session && !gate && day === 'legs' && tomorrowKind === 'padel'
+    ? '<span class="tag" style="background:var(--tint)">Mañana tienes pádel: mejor deja Legs para otro día</span>' : '';
+
   host.innerHTML = `
     <div class="head"><span class="eyebrow">${esc(dateTxt)}</span><h1>Hoy</h1></div>
+    ${weekStripHtml(w)}
     ${mobCard}
-    <div class="card">
+    ${gate}
+    ${gate ? '' : `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <span class="eyebrow">${session ? 'Sesión en curso' : 'Te toca'}</span>
+        <span class="eyebrow">${session ? 'Sesión en curso' : light ? 'Te toca · versión ligera' : 'Te toca'}</span>
         <span class="muted small">Semana ${session ? session.variant : variant}</span>
       </div>
+      ${tomorrowNote}
       <div style="display:flex;flex-direction:column;gap:2px">
         <span style="font-size:28px;font-weight:800;line-height:1.1">${PROGRAM[day].name}</span>
         <span class="muted small">${items.length} ejercicios · unos 75 min${session ? ' · ' + done + ' series hechas' : ''}</span>
       </div>
       <div class="list" style="gap:0">
-        ${items.slice(0, 3).map((e) => `<div class="item" style="min-height:44px;font-size:15px"><span>${esc(e.name)}</span><span>${e.sets} × ${e.reps[0]}-${e.reps[1]}</span></div>`).join('')}
+        ${items.slice(0, 3).map((e) => `<div class="item" style="min-height:44px;font-size:15px"><span>${esc(e.name)}</span><span>${session ? e.sets : lightSets(e, light)} × ${e.reps[0]}-${e.reps[1]}</span></div>`).join('')}
         <div class="item" style="min-height:40px"><span class="muted small">+ ${items.length - 3} ejercicios más</span><span></span></div>
       </div>
       ${session
         ? `<button class="btn primary" id="go" style="flex:none">Continuar sesión</button>
            <button class="btn" id="discard" style="flex:none;min-height:44px;color:var(--coral);border-color:#E8B8B2">Descartar sesión</button>`
         : `<button class="btn primary" id="go" style="flex:none">${svg('<path d="M8 5.5v13l11-6.5z"/>', 18, 2, 'fill="#fff" stroke="#fff"')}Empezar sesión</button>`}
-    </div>
-    ${session ? '' : `
+    </div>`}
+    ${session || gate ? '' : `
     <div class="card">
       <span class="eyebrow">¿Otro día?</span>
       <div class="chips" role="group" aria-label="Elegir día">
@@ -145,6 +193,8 @@ async function showToday() {
       <p>Por defecto te propone el siguiente día del ciclo Push, Pull, Legs. ${lastSession ? 'Última sesión: ' + PROGRAM[lastSession.day].name + ', ' + relDay(lastSession.finishedAt) + '.' : 'Aún no has registrado ninguna sesión.'}</p>
     </div>`}
 `;
+  host.querySelectorAll('[data-date]').forEach((b) => b.addEventListener('click', () => openDaySheet(b.dataset.date, showToday)));
+  host.querySelectorAll('[data-choice]').forEach((b) => b.addEventListener('click', async () => { await chooseToday(b.dataset.choice || null); showToday(); }));
   host.querySelectorAll('[data-day]').forEach((b) => b.addEventListener('click', () => { pickedDay = b.dataset.day; showToday(); }));
   document.getElementById('routines').addEventListener('toggle', (e) => { routinesOpen = e.target.open; });
   host.querySelectorAll('[data-routine]').forEach((b) => b.addEventListener('click', () => { pickedRoutine = b.dataset.routine; showToday(); }));
@@ -152,8 +202,9 @@ async function showToday() {
   document.getElementById('mob-start').addEventListener('click', () => {
     startMobility(host, hooks, routineId, () => { pickedRoutine = null; showToday(); });
   });
-  document.getElementById('go').addEventListener('click', async () => {
-    if (!session) await startSession(day);
+  const goBtn = document.getElementById('go');
+  if (goBtn) goBtn.addEventListener('click', async () => {
+    if (!session) await startSession(day, light);
     view = 'train';
     showTrain();
   });
@@ -172,14 +223,14 @@ function relDay(iso) {
   return d <= 0 ? 'hoy' : d === 1 ? 'ayer' : 'hace ' + d + ' días';
 }
 
-async function startSession(day) {
+async function startSession(day, light = false) {
   const variant = await programVariant();
   const items = sessionFor(day, variant);
   const sets = {};
-  session = { id: Date.now(), day, variant, startedAt: new Date().toISOString(), idx: 0, ids: items.map((e) => e.id), sets, restEnd: null, restTotal: 0 };
+  session = { id: Date.now(), day, variant, light, startedAt: new Date().toISOString(), idx: 0, ids: items.map((e) => e.id), sets, restEnd: null, restTotal: 0 };
   for (const ex of items) {
     const last = await lastTime(ex.id);
-    sets[ex.id] = Array.from({ length: ex.sets }, (_, i) => {
+    sets[ex.id] = Array.from({ length: lightSets(ex, light) }, (_, i) => {
       const l = last && (last[i] || last[last.length - 1]);
       return { w: l ? l.weight : '', r: l ? l.reps : '', done: false };
     });
@@ -221,7 +272,7 @@ async function showTrain() {
     </div>
     <div style="display:flex;flex-direction:column;gap:6px">
       <h1 style="font-size:28px">${esc(ex.name)}</h1>
-      <span class="muted" style="font-size:15px">${esc(ex.equip)} · ${ex.sets} series · ${ex.reps[0]}-${ex.reps[1]} reps · 3-4 en reserva</span>
+      <span class="muted" style="font-size:15px">${esc(ex.equip)} · ${sets.length} series · ${ex.reps[0]}-${ex.reps[1]} reps · 3-4 en reserva</span>
     </div>
     ${ex.tecnica ? '<span class="tag">Aprende primero la técnica con poco peso</span>' : ''}
     <div class="row">
