@@ -215,4 +215,13 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
+  // Cuando se instala una versión nueva, recarga sola para usarla (salvo en mitad de un entreno o una rutina).
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return;
+    if (document.querySelector('.setrow, #mob-card')) return;
+    reloaded = true;
+    location.reload();
+  });
 }
