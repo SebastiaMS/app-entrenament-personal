@@ -212,6 +212,19 @@ window.addEventListener('offline', () => current === 'ajustes' && render());
 render();
 requestPersistence();
 
+// Sin zoom por doble toque (iOS): un segundo toque rápido se convierte en clic en todo el botón
+let lastTouch = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  const quick = now - lastTouch < 450;
+  lastTouch = now;
+  if (!quick || e.touches.length || e.target.closest('input, textarea, select')) return;
+  const hit = e.target.closest('button, a[href], summary, label, [role="button"]');
+  e.preventDefault();
+  if (hit && !hit.disabled) hit.click();
+}, { passive: false });
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
 // Los enlaces a vídeos de YouTube se abren dentro de la app
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[href*="youtube.com/watch"]');

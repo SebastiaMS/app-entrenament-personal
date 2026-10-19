@@ -337,3 +337,5 @@ dialog.videodlg { width: min(560px, calc(100vw - 24px)); padding: 12px; }
 
 /* Sin zoom por doble toque: tocar botones seguidos no amplía la pantalla */
 html, body, button, a, input, label, summary, .card { touch-action: manipulation; }
+button, summary, a, label { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+button *, .btn *, .mini *, .hecha *, .next-btn *, .back-btn * { pointer-events: none; }
