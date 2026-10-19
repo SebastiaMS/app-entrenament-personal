@@ -79,3 +79,33 @@ export function releaseAwake() {
   try { wakeLock && wakeLock.release(); } catch (e) { /* nada */ }
   wakeLock = null;
 }
+
+// ---- Vídeo de YouTube dentro de la app ----
+export function youtubeId(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.endsWith('youtube.com') && u.pathname === '/watch') return u.searchParams.get('v');
+    if (u.hostname === 'youtu.be') return u.pathname.slice(1);
+  } catch (e) { /* url no válida */ }
+  return null;
+}
+
+export function openVideo(url) {
+  const id = youtubeId(url);
+  if (!id) { window.open(url, '_blank', 'noopener'); return; }
+  if (navigator.onLine === false) { toast('Sin conexión: los vídeos necesitan internet'); return; }
+  const dlg = document.createElement('dialog');
+  dlg.className = 'videodlg';
+  dlg.innerHTML = `
+    <div class="vframe"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?playsinline=1&rel=0" title="Vídeo de la técnica" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+    <div class="row" style="margin-top:12px">
+      <a class="btn" href="${url}" target="_blank" rel="noopener" data-external style="min-height:48px">Abrir en YouTube</a>
+      <button class="btn primary" id="vid-close" style="min-height:48px">Cerrar</button>
+    </div>`;
+  document.body.appendChild(dlg);
+  const close = () => { dlg.close(); dlg.remove(); };
+  dlg.querySelector('#vid-close').addEventListener('click', close);
+  dlg.addEventListener('cancel', () => dlg.remove());
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });
+  dlg.showModal();
+}

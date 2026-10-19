@@ -158,7 +158,7 @@ function showEx() {
     <a class="videobox" href="${mobVideoUrl(id)}" target="_blank" rel="noopener">
       <span class="play">${svg('<path d="M8 5.5v13l11-6.5z"/>', 24, 2, 'fill="#fff" stroke="#fff"')}</span>
       <span>Ver vídeo de la técnica</span>
-      <small>Necesita conexión</small>
+      <small>Necesita conexión · se abre aquí mismo</small>
     </a>
     <div class="card" style="gap:8px;padding:14px 16px">
       <span class="eyebrow">Puntos clave</span>

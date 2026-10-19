@@ -4,6 +4,7 @@ import { programVariant, renderToday } from './train.js';
 import { renderHistory } from './history.js';
 import { renderWeek } from './week.js';
 import { renderNutrition } from './nutrition.js';
+import { openVideo } from './util.js';
 
 const ICONS = {
   hoy: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
@@ -210,6 +211,14 @@ window.addEventListener('offline', () => current === 'ajustes' && render());
 
 render();
 requestPersistence();
+
+// Los enlaces a vídeos de YouTube se abren dentro de la app
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[href*="youtube.com/watch"]');
+  if (!a || a.hasAttribute('data-external')) return;
+  e.preventDefault();
+  openVideo(a.href);
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
