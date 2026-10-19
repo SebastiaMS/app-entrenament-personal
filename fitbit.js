@@ -26,14 +26,14 @@ export function preloadGis() {
   return loadGis().catch(() => {});
 }
 
-export function getToken(clientId) {
+export function getToken(clientId, scope = SCOPE) {
   return new Promise((resolve, reject) => {
     if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) {
       return reject(new Error('El inicio de sesión de Google aún no ha cargado. Espera un segundo y vuelve a pulsar (necesita conexión).'));
     }
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: SCOPE,
+      scope,
       callback: (r) => (r.error ? reject(new Error('Google respondió: ' + r.error + (r.error_description ? ' · ' + r.error_description : ''))) : resolve(r.access_token)),
       error_callback: (e) => reject(new Error('No se completó el inicio de sesión (' + (e && e.type ? e.type : 'cancelado') + ')'))
     });
@@ -81,4 +81,63 @@ export async function syncFromFitbit(clientId) {
   const token = await tokenPromise;
   const points = await fetchCalories(token);
   return summarize(points);
+}
+
+// ---- Sueño ----
+export const SLEEP_SCOPE = 'https://www.googleapis.com/auth/googlehealth.sleep.readonly';
+export const LOW_SLEEP_MIN = 360; // menos de 6 h dormido: se propone la versión ligera
+const URL_SLEEP = 'https://health.googleapis.com/v4/users/me/dataTypes/sleep/dataPoints:reconcile';
+
+const msOf = (t) => (t ? Date.parse(t) : NaN);
+
+// Minutos dormidos de una sesión: resumen si viene, si no etapas sin "despierto", si no el intervalo.
+export function sessionMinutes(p) {
+  const s = p && p.sleep ? p.sleep : p || {};
+  if (s.summary && typeof s.summary.minutesAsleep !== 'undefined') return Number(s.summary.minutesAsleep);
+  const stages = s.stages || s.sleepStages;
+  if (Array.isArray(stages) && stages.length) {
+    return Math.round(stages.filter((x) => x.type !== 'AWAKE').reduce((a, x) => a + (msOf(x.endTime) - msOf(x.startTime)), 0) / 60000);
+  }
+  const i = s.interval || s;
+  const d = (msOf(i.endTime) - msOf(i.startTime)) / 60000;
+  return Number.isFinite(d) ? Math.round(d) : 0;
+}
+
+// Fecha local (en la zona de la propia sesión) en la que terminó.
+export function endDateOf(p) {
+  const s = p && p.sleep ? p.sleep : p || {};
+  const i = s.interval || s;
+  const civil = i.civilEndTime && i.civilEndTime.date;
+  if (civil) return key(civil);
+  const off = parseInt(String(i.endUtcOffset || '0').replace('s', ''), 10) || 0;
+  const t = msOf(i.endTime);
+  if (!Number.isFinite(t)) return null;
+  return new Date(t + off * 1000).toISOString().slice(0, 10);
+}
+
+// Suma lo dormido en las sesiones que terminan hoy. Devuelve { date, minutes } o null si no hay.
+export function summarizeSleep(points, now = new Date()) {
+  const today = dateOf(now);
+  const mine = (points || []).filter((p) => endDateOf(p) === today);
+  if (!mine.length) return null;
+  const minutes = mine.reduce((a, p) => a + sessionMinutes(p), 0);
+  return minutes > 0 ? { date: today, minutes } : null;
+}
+
+export async function fetchSleep(token, now = new Date()) {
+  const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const q = new URLSearchParams({
+    dataSourceFamily: 'users/me/dataSourceFamilies/google-wearables',
+    filter: `sleep.interval.civil_end_time >= "${dateOf(y)}"`
+  });
+  const res = await fetch(URL_SLEEP + '?' + q, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json.error && json.error.message ? json.error.message : 'Error ' + res.status).split('\n')[0]);
+  return json.dataPoints || [];
+}
+
+export async function syncSleep(clientId) {
+  const tokenPromise = getToken(clientId, SLEEP_SCOPE); // sin await antes: se abre en el toque
+  const token = await tokenPromise;
+  return summarizeSleep(await fetchSleep(token));
 }

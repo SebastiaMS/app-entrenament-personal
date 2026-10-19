@@ -3,6 +3,7 @@ import { del, getAll, getByIndex, getSetting, put, setSetting } from './db.js';
 import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } from './exercises.js';
 import { beep, esc, flashCard, fmtClock, keepAwake, localDate, releaseAwake, svg, toast, unlockAudio } from './util.js';
 import { suggestion } from './progress.js';
+import { LOW_SLEEP_MIN, preloadGis, syncSleep } from './fitbit.js';
 import { KINDS, getMark, openDaySheet, weekData, weekStripHtml, weekTip } from './week.js';
 import { ROUTINES, doneToday, favorites, routineMinutes, startMobility, suggestedRoutine, toggleFavorite } from './mobility.js';
 
@@ -159,6 +160,30 @@ async function showToday() {
         <button class="btn" data-choice="train" style="flex:none;min-height:48px">Entrenar igualmente</button></div>`;
     }
   }
+  // Tarjeta de sueño (Fitbit): solo si ya has conectado Google en Nutrición
+  let sleepCard = '';
+  const clientId = await getSetting('googleClientId');
+  if (!session && !gate && clientId) {
+    const sl = await getSetting('sleep');
+    const fresh = sl && sl.date === localDate();
+    const fmt = (m) => `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+    if (!fresh) {
+      sleepCard = `<div class="card" id="sleep-card"><span class="eyebrow">Descanso · Fitbit</span>
+        <p>Lee cuánto dormiste y la app te dirá si conviene la versión ligera.</p>
+        <button class="btn" id="sleep-sync" style="flex:none;min-height:48px">Leer mi sueño de la Fitbit</button>
+        <div class="msg" id="sleep-msg" role="status"></div></div>`;
+    } else if (sl.minutes < LOW_SLEEP_MIN) {
+      sleepCard = `<div class="card" id="sleep-card"><span class="eyebrow">Descanso · Fitbit</span>
+        <span style="font-size:20px;font-weight:800;line-height:1.2">Dormiste ${fmt(sl.minutes)}</span>
+        <p>Menos de 6 h: hoy rendirás menos y recuperas peor. Te sugiero la versión ligera (una serie menos por ejercicio).</p>
+        ${choice === 'light' ? '<span class="tag" style="background:var(--green-tint);color:var(--green)">Versión ligera activada</span>'
+          : '<button class="btn primary" data-choice="light" style="flex:none;min-height:48px">Usar versión ligera</button>'}</div>`;
+    } else {
+      sleepCard = `<div class="card" id="sleep-card"><span class="eyebrow">Descanso · Fitbit</span>
+        <span style="font-size:20px;font-weight:800;line-height:1.2">Dormiste ${fmt(sl.minutes)}</span>
+        <p>Buen descanso: sesión normal.</p></div>`;
+    }
+  }
   const tomorrowNote = !session && !gate && day === 'legs' && tomorrowKind === 'padel'
     ? '<span class="tag" style="background:var(--tint)">Mañana tienes pádel: mejor deja Legs para otro día</span>' : '';
 
@@ -166,6 +191,7 @@ async function showToday() {
     <div class="head"><span class="eyebrow">${esc(dateTxt)}</span><h1>Hoy</h1></div>
     ${weekStripHtml(w, weekTip(w, sessions, suggested))}
     ${mobCard}
+    ${sleepCard}
     ${gate}
     ${gate ? '' : `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
@@ -195,6 +221,22 @@ async function showToday() {
       <p>Por defecto te propone el siguiente día del ciclo Push, Pull, Legs. ${lastSession ? 'Última sesión: ' + PROGRAM[lastSession.day].name + ', ' + relDay(lastSession.finishedAt) + '.' : 'Aún no has registrado ninguna sesión.'}</p>
     </div>`}
 `;
+  const sync = document.getElementById('sleep-sync');
+  if (sync) {
+    preloadGis();
+    sync.addEventListener('click', async () => {
+      const msg = document.getElementById('sleep-msg');
+      msg.textContent = 'Conectando con Google…';
+      const p = syncSleep(clientId); // dentro del toque, para que la ventana de Google no se bloquee
+      p.catch(() => {});
+      try {
+        const r = await p;
+        if (!r) { msg.textContent = 'Aún no hay sueño de esta noche en Google Health. Abre la app de Fitbit/Google Health para sincronizar y vuelve a probar.'; return; }
+        await setSetting('sleep', r);
+        showToday();
+      } catch (e) { msg.textContent = 'No se pudo leer: ' + e.message; }
+    });
+  }
   const more = document.getElementById('ex-more');
   if (more) more.addEventListener('click', () => { showAllEx = !showAllEx; showToday(); });
   host.querySelectorAll('[data-date]').forEach((b) => b.addEventListener('click', () => openDaySheet(b.dataset.date, showToday)));
