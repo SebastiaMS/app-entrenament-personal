@@ -1,7 +1,7 @@
 // Historial: evolución, mejor marca y sesiones de cada ejercicio, con tus series reales.
 import { getAll, getByIndex } from './db.js';
 import { EXERCISES, PROGRAM } from './exercises.js';
-import { esc, localDate, svg } from './util.js';
+import { esc, localDate, svg, toast } from './util.js';
 
 const DAYS = Object.keys(PROGRAM); // push, pull, legs
 const MAX_POINTS = 12;
@@ -18,7 +18,7 @@ const dateLabel = (iso) => {
   return new Date(y, m - 1, d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).replace('.', '');
 };
 
-const state = { day: null, exId: null, tab: 0, range: 2, sel: null, open: false };
+const state = { mode: 'ejercicio', wSel: null, day: null, exId: null, tab: 0, range: 2, sel: null, open: false };
 let host = null;
 
 function exercisesOf(day) {
@@ -72,8 +72,11 @@ export async function renderHistory(container) {
   const rows = await getByIndex('logs', 'exerciseId', state.exId);
   const sessions = sessionsOf(rows, ex);
 
+  if (state.mode === 'entrenos') return drawWorkouts(allSessions, allLogs);
+
   host.innerHTML = `
     <div class="head"><span class="eyebrow">Tu progreso</span><h1>Historial</h1></div>
+    ${modeChips()}
     <div class="chips" role="group" aria-label="Día">
       ${DAYS.map((d) => `<button class="chip" data-day="${d}" aria-pressed="${d === state.day}">${PROGRAM[d].name}</button>`).join('')}
     </div>
@@ -91,6 +94,7 @@ export async function renderHistory(container) {
     </div>
     <div id="hist-body"></div>`;
 
+  bindMode();
   host.querySelectorAll('[data-day]').forEach((b) => b.addEventListener('click', () => { state.day = b.dataset.day; state.exId = null; state.open = false; renderHistory(host); }));
   document.getElementById('ex-btn').addEventListener('click', () => { state.open = !state.open; renderHistory(host); });
   host.querySelectorAll('[data-ex]').forEach((b) => b.addEventListener('click', () => { state.exId = b.dataset.ex; state.sel = null; state.open = false; renderHistory(host); }));
@@ -229,4 +233,100 @@ function drawSessions(body, sessions) {
     </div>`).join('')}
     ${sessions.length > 12 ? '<span class="muted small">Se muestran las últimas 12 sesiones.</span>' : ''}
   </div>`;
+}
+
+
+// ---------- Entrenos completos (para copiar o pasar a otra app) ----------
+function modeChips() {
+  return `<div class="chips" role="group" aria-label="Vista">
+    <button class="chip" data-mode="ejercicio" aria-pressed="${state.mode === 'ejercicio'}">Por ejercicio</button>
+    <button class="chip" data-mode="entrenos" aria-pressed="${state.mode === 'entrenos'}">Entrenos completos</button>
+  </div>`;
+}
+function bindMode() {
+  host.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { state.mode = b.dataset.mode; state.wSel = null; renderHistory(host); }));
+}
+
+const longDate = (iso) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+};
+const sessionDate = (s) => localDate(new Date(s.finishedAt || s.startedAt || s.id));
+
+// Series de una sesión agrupadas por ejercicio, en el orden de la sesión.
+export function workoutOf(session, logs) {
+  const mine = logs.filter((l) => l.sessionId === session.id);
+  const order = session.ids && session.ids.length ? session.ids : [...new Set(mine.map((l) => l.exerciseId))];
+  return order
+    .map((id) => ({ id, name: EXERCISES[id] ? EXERCISES[id].name : id, bw: EXERCISES[id] && EXERCISES[id].carga === 'peso-corporal', sets: mine.filter((l) => l.exerciseId === id).sort((a, b) => a.setIndex - b.setIndex) }))
+    .filter((e) => e.sets.length);
+}
+
+const setText = (e, s) => (e.bw ? `${s.reps} reps` : `${fmt(s.weight)} kg × ${s.reps}`);
+
+export function workoutText(session, logs) {
+  const ex = workoutOf(session, logs);
+  const mins = session.finishedAt && session.startedAt ? Math.max(1, Math.round((new Date(session.finishedAt) - new Date(session.startedAt)) / 60000)) : null;
+  const head = `${PROGRAM[session.day] ? PROGRAM[session.day].name : session.day} · ${longDate(sessionDate(session))}${mins ? ' · ' + mins + ' min' : ''}`;
+  const body = ex.map((e) => `${e.name}\n${e.sets.map((s, i) => `  Serie ${i + 1}: ${setText(e, s)}`).join('\n')}`).join('\n\n');
+  return `${head}\n\n${body}`;
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+
+function drawWorkouts(sessions, logs) {
+  const done = sessions.filter((s) => s.finishedAt).sort((a, b) => b.id - a.id);
+  const head = `<div class="head"><span class="eyebrow">Tu progreso</span><h1>Historial</h1></div>${modeChips()}`;
+  if (!done.length) {
+    host.innerHTML = `${head}<div class="placeholder"><strong>Aún no hay entrenos</strong><span>Cuando termines una sesión, aparecerá aquí completa con pesos y repeticiones.</span></div>`;
+    bindMode();
+    return;
+  }
+  if (state.wSel && !done.find((s) => s.id === state.wSel)) state.wSel = null;
+  if (!state.wSel) {
+    host.innerHTML = `${head}
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${done.map((s) => {
+          const ex = workoutOf(s, logs);
+          const nSets = ex.reduce((n, e) => n + e.sets.length, 0);
+          return `<button class="selbtn" data-w="${s.id}" style="min-height:64px"><span style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left"><strong>${PROGRAM[s.day] ? PROGRAM[s.day].name : esc(s.day)} · ${dateLabel(sessionDate(s))}</strong><span class="muted small">${ex.length} ejercicios · ${nSets} series</span></span>${svg('<path d="M9 5l7 7-7 7"/>', 20, 2.5)}</button>`;
+        }).join('')}
+      </div>`;
+    bindMode();
+    host.querySelectorAll('[data-w]').forEach((b) => b.addEventListener('click', () => { state.wSel = +b.dataset.w; renderHistory(host); }));
+    return;
+  }
+  const s = done.find((x) => x.id === state.wSel);
+  const ex = workoutOf(s, logs);
+  const text = workoutText(s, logs);
+  host.innerHTML = `${head}
+    <button class="btn" id="w-back" style="flex:none;min-height:44px;align-self:flex-start">${svg('<path d="M15 5l-7 7 7 7"/>', 18, 2.5)}Todos los entrenos</button>
+    <div class="card">
+      <span class="eyebrow">${PROGRAM[s.day] ? PROGRAM[s.day].name : esc(s.day)}</span>
+      <span style="font-size:20px;font-weight:800;text-transform:capitalize">${esc(longDate(sessionDate(s)))}</span>
+      <div class="row">
+        <button class="btn primary" id="w-copy" style="min-height:48px">Copiar entreno</button>
+        ${navigator.share ? '<button class="btn" id="w-share" style="min-height:48px">Compartir</button>' : ''}
+      </div>
+    </div>
+    ${ex.map((e) => `<div class="card"><span style="font-size:17px;font-weight:800">${esc(e.name)}</span>
+      <div class="list" style="gap:0">${e.sets.map((x, i) => `<div class="item" style="min-height:40px;font-size:15px"><span class="muted">Serie ${i + 1}</span><span style="font-weight:800">${setText(e, x)}</span></div>`).join('')}</div></div>`).join('')}`;
+  bindMode();
+  document.getElementById('w-back').addEventListener('click', () => { state.wSel = null; renderHistory(host); });
+  document.getElementById('w-copy').addEventListener('click', async () => toast((await copyText(text)) ? 'Entreno copiado' : 'No se pudo copiar'));
+  const sh = document.getElementById('w-share');
+  if (sh) sh.addEventListener('click', () => navigator.share({ title: 'Entreno', text }).catch(() => {}));
 }
