@@ -39,6 +39,7 @@ let timerId = null;
 let resumed = false;
 let pickedRoutine = null;  // rutina de movilidad elegida en Hoy
 let routinesOpen = false;  // lista de rutinas desplegada
+let showAllEx = false;     // lista completa de ejercicios de hoy
 
 // Decisión de hoy cuando hay marca (pádel, oficina, descanso): { date, choice }
 async function todayChoice() {
@@ -177,8 +178,8 @@ async function showToday() {
         <span class="muted small">${items.length} ejercicios · unos 75 min${session ? ' · ' + done + ' series hechas' : ''}</span>
       </div>
       <div class="list" style="gap:0">
-        ${items.slice(0, 3).map((e) => `<div class="item" style="min-height:44px;font-size:15px"><span>${esc(e.name)}</span><span>${session ? e.sets : lightSets(e, light)} × ${e.reps[0]}-${e.reps[1]}</span></div>`).join('')}
-        <div class="item" style="min-height:40px"><span class="muted small">+ ${items.length - 3} ejercicios más</span><span></span></div>
+        ${(showAllEx ? items : items.slice(0, 3)).map((e) => `<div class="item" style="min-height:44px;font-size:15px"><span>${esc(e.name)}</span><span>${session ? e.sets : lightSets(e, light)} × ${e.reps[0]}-${e.reps[1]}</span></div>`).join('')}
+        ${items.length > 3 ? `<button class="item" id="ex-more" style="min-height:44px;background:none;border:none;font-family:inherit;cursor:pointer;color:var(--ochre-text);font-weight:800;font-size:15px;text-align:left"><span>${showAllEx ? 'Ver menos' : '+ ' + (items.length - 3) + ' ejercicios más'}</span><span></span></button>` : ''}
       </div>
       ${session
         ? `<button class="btn primary" id="go" style="flex:none">Continuar sesión</button>
@@ -194,6 +195,8 @@ async function showToday() {
       <p>Por defecto te propone el siguiente día del ciclo Push, Pull, Legs. ${lastSession ? 'Última sesión: ' + PROGRAM[lastSession.day].name + ', ' + relDay(lastSession.finishedAt) + '.' : 'Aún no has registrado ninguna sesión.'}</p>
     </div>`}
 `;
+  const more = document.getElementById('ex-more');
+  if (more) more.addEventListener('click', () => { showAllEx = !showAllEx; showToday(); });
   host.querySelectorAll('[data-date]').forEach((b) => b.addEventListener('click', () => openDaySheet(b.dataset.date, showToday)));
   host.querySelectorAll('[data-choice]').forEach((b) => b.addEventListener('click', async () => { await chooseToday(b.dataset.choice || null); showToday(); }));
   host.querySelectorAll('[data-day]').forEach((b) => b.addEventListener('click', () => { pickedDay = b.dataset.day; showToday(); }));
