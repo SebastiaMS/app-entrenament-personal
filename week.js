@@ -27,6 +27,37 @@ export async function setMark(date, kind) {
   return put('schedule', { date, kind });
 }
 
+// Semanas (lunes a domingo) con 3 o más sesiones terminadas, seguidas. La semana en curso suma si ya llegó a 3.
+export const WEEK_GOAL = 3;
+export function streakOf(sessions, now = new Date()) {
+  const per = new Map();
+  for (const s of sessions) {
+    if (!s.finishedAt) continue;
+    const k = localDate(mondayOf(new Date(s.finishedAt)));
+    per.set(k, (per.get(k) || 0) + 1);
+  }
+  const cur = mondayOf(now);
+  let streak = 0;
+  const d = new Date(cur);
+  if ((per.get(localDate(d)) || 0) < WEEK_GOAL) d.setDate(d.getDate() - 7);
+  while ((per.get(localDate(d)) || 0) >= WEEK_GOAL) { streak++; d.setDate(d.getDate() - 7); }
+  return streak;
+}
+
+// Resumen de una semana: sesiones, series, volumen (kg) y días de movilidad.
+export async function weekSummary(ref = new Date()) {
+  const start = mondayOf(ref);
+  const dates = new Set(Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return localDate(d); }));
+  const [sessions, logs, mob] = await Promise.all([getAll('sessions'), getAll('logs'), getAll('mobility')]);
+  const l = logs.filter((x) => dates.has(x.date));
+  return {
+    sessions: sessions.filter((s) => s.finishedAt && dates.has(localDate(new Date(s.finishedAt)))).length,
+    sets: l.length,
+    volume: Math.round(l.reduce((a, x) => a + (Number(x.weight) || 0) * (Number(x.reps) || 0), 0)),
+    mobDays: new Set(mob.filter((m) => dates.has(m.date)).map((m) => m.date)).size
+  };
+}
+
 // Datos de la semana que contiene `ref`.
 export async function weekData(ref = new Date()) {
   const start = mondayOf(ref);
@@ -52,6 +83,7 @@ export async function weekData(ref = new Date()) {
   const mobDue = days.filter((d) => d.mobDue && (d.past || d.isToday));
   return {
     days,
+    streak: streakOf(sessions),
     gymCount: days.filter((d) => d.gym).length,
     mobDone: mobDue.filter((d) => d.mob).length,
     mobTotal: mobDue.length
@@ -100,6 +132,7 @@ export function weekStripHtml(w, tip) {
       </div>
       <div class="wstrip">${cells}</div>
       <div class="wleg"><span><i class="wd gym"></i>Gimnasio ${w.gymCount}</span><span><i class="wd mob"></i>${esc(mobTxt)}</span></div>
+      ${w.streak ? `<div class="muted small" style="font-weight:700">Racha: ${w.streak} semana${w.streak === 1 ? '' : 's'} seguida${w.streak === 1 ? '' : 's'} con ${WEEK_GOAL} sesiones</div>` : ''}
       ${tip ? `<div class="lastline" id="week-tip" style="align-items:flex-start"><span>${esc(tip)}</span></div>` : ''}
     </div>`;
 }
@@ -138,10 +171,29 @@ export async function openDaySheet(date, onChange) {
 export async function renderWeek(container) {
   const next = new Date();
   next.setDate(next.getDate() + 7);
-  const [a, b] = await Promise.all([weekData(), weekData(next)]);
+  const prev = new Date();
+  prev.setDate(prev.getDate() - 7);
+  const [a, b, sumNow, sumPrev] = await Promise.all([weekData(), weekData(next), weekSummary(), weekSummary(prev)]);
+  const fmtN = (n) => n.toLocaleString('es-ES');
+  const row = (label, k, unit = '') => `<div class="item" style="min-height:40px;font-size:15px"><span>${label}</span><span><strong>${fmtN(sumNow[k])}${unit}</strong> <span class="muted small">${sumPrev[k] ? 'antes ' + fmtN(sumPrev[k]) + unit : ''}</span></span></div>`;
+  const summaryCard = `
+    <div class="card" id="week-summary">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="eyebrow">Resumen de esta semana</span>
+        <span class="muted small">frente a la anterior</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:28px;font-weight:800;line-height:1.1">${a.streak} ${a.streak === 1 ? 'semana' : 'semanas'}</span>
+        <span class="muted small">de racha con ${WEEK_GOAL} sesiones${a.streak ? '' : ': empieza esta semana'}</span>
+      </div>
+      <div class="list" style="gap:0">
+        ${row('Sesiones', 'sessions')}${row('Series hechas', 'sets')}${row('Volumen total', 'volume', ' kg')}${row('Días de movilidad', 'mobDays')}
+      </div>
+    </div>`;
   const strip = (w, title) => weekStripHtml(w).replace('Esta semana', title).replace('id="week"', '');
   container.innerHTML = `
     <div class="head"><span class="eyebrow">Calendario</span><h1>Semana</h1></div>
+    ${summaryCard}
     ${strip(a, 'Esta semana')}
     ${strip(b, 'La semana que viene')}
     <p class="muted small" style="margin:0">Marca con antelación tus días de oficina o pádel. Los días de oficina no cuentan para la movilidad y no se proponen pesas. El ciclo Push, Pull, Legs sigue donde estaba.</p>`;

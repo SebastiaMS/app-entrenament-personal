@@ -11,8 +11,38 @@ const DAYS = ['push', 'pull', 'legs'];
 const DEFAULT_REST = 90;
 // Descanso entre series según el tipo de ejercicio: los compuestos pesados piden más (2:30),
 // el aislamiento y el trabajo pequeño se recuperan antes (1:30).
+// Calentamiento: no se registra. El primer compuesto del día lleva 2 series (50 % y 70 %); los demás, 1 al 60 %.
+function warmupHtml(id, sets) {
+  const ex = EXERCISES[id];
+  const w = sets[0] && Number(sets[0].w);
+  if (!isCompound(ex) || !(w >= 20)) return '';
+  const first = session.ids.find((x) => isCompound(EXERCISES[x])) === id;
+  const rows = first ? [[0.5, 8], [0.7, 5]] : [[0.6, 5]];
+  return `<div class="lastline" id="warmup" style="align-items:flex-start">${svg('<path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>', 16, 2)}<span><strong>Calienta antes</strong> (no se cuenta): ${rows.map(([p, r]) => `${fmtKg(Math.max(2.5, round25(w * p)))} kg × ${r}`).join(' · ')}</span></div>`;
+}
 const SMALL = /aislamiento|tr[ií]ceps|b[ií]ceps|abdomen|antebrazo|lateral|gemelo|trasero/i;
 const restFor = (ex) => (SMALL.test(ex.muscle) || ex.reps[0] >= 12 ? 90 : 150);
+
+const isCompound = (ex) => restFor(ex) === 150 && ex.carga !== 'peso-corporal';
+const round25 = (n) => Math.round(n / 2.5) * 2.5;
+const DAY_MS = 86400000;
+const addDays = (iso, n) => localDate(new Date(new Date(iso + 'T12:00:00').getTime() + n * DAY_MS));
+
+// Semana de descarga: tras 6 semanas seguidas, una semana con una serie menos y ~15 % menos de peso.
+async function deloadInfo() {
+  const today = localDate();
+  let d = await getSetting('deload');
+  if (d && d.until < today) {
+    await setSetting('lastDeload', d.until);
+    await setSetting('deload', null);
+    d = null;
+  }
+  if (d) return { active: true, until: d.until, due: false, weeks: 0 };
+  const base = (await getSetting('lastDeload')) || localDate(new Date(await getSetting('programStart', new Date().toISOString())));
+  const weeks = Math.floor((new Date(today + 'T12:00:00') - new Date(base + 'T12:00:00')) / (7 * DAY_MS));
+  const snooze = await getSetting('deloadSnooze');
+  return { active: false, until: null, due: weeks >= 6 && !(snooze && snooze > today), weeks };
+}
 
 const fmtKg = (n) => String(n).replace('.', ',');
 const parseNum = (v) => parseFloat(String(v).replace(',', '.'));
@@ -103,11 +133,12 @@ async function showToday() {
   const lastSession = sessions.sort((a, b) => b.id - a.id)[0];
   const w = await weekData();
   const tIdx = w.days.findIndex((d) => d.isToday);
-  const kind = w.days[tIdx].kind;
+  const kind = (w.days[tIdx] || {}).kind || null;
   const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
   const tomorrowKind = await getMark(localDate(tmr));
   const choice = await todayChoice();
-  const light = !session && choice === 'light';
+  const dl = await deloadInfo();
+  const light = !session && (choice === 'light' || dl.active);
   const dateTxt = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
 
   const done = session ? Object.values(session.sets).flat().filter((s) => s.done).length : 0;
@@ -188,6 +219,20 @@ async function showToday() {
         <p>Buen descanso: sesión normal.</p></div>`;
     }
   }
+  let deloadCard = '';
+  if (!session && !gate) {
+    if (dl.active) {
+      deloadCard = `<div class="card" id="deload-card"><span class="eyebrow">Semana de descarga</span>
+        <p>Hasta el ${new Date(dl.until + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}: una serie menos y un 15 % menos de peso, sin llegar al fallo. Así se recupera el cuerpo y luego se sube mejor.</p>
+        <button class="btn" data-deload="off" style="flex:none;min-height:44px">Cancelar la descarga</button></div>`;
+    } else if (dl.due) {
+      deloadCard = `<div class="card" id="deload-card"><span class="eyebrow">Toca descarga</span>
+        <span style="font-size:20px;font-weight:800;line-height:1.2">Llevas ${dl.weeks} semanas seguidas</span>
+        <p>Una semana más suave (una serie menos y un 15 % menos de peso) deja que se disipe la fatiga acumulada y evita estancarte. Después sigues con tu progresión.</p>
+        <button class="btn primary" data-deload="on" style="flex:none;min-height:48px">Empezar semana de descarga</button>
+        <button class="btn" data-deload="snooze" style="flex:none;min-height:44px">Ahora no (preguntar en una semana)</button></div>`;
+    }
+  }
   const tomorrowNote = !session && !gate && day === 'legs' && tomorrowKind === 'padel'
     ? '<span class="tag" style="background:var(--tint)">Mañana tienes pádel: mejor deja Legs para otro día</span>' : '';
 
@@ -196,6 +241,7 @@ async function showToday() {
     ${weekStripHtml(w, weekTip(w, sessions, suggested))}
     ${mobCard}
     ${sleepCard}
+    ${deloadCard}
     ${gate}
     ${gate ? '' : `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
@@ -225,6 +271,13 @@ async function showToday() {
       <p>Por defecto te propone el siguiente día del ciclo Push, Pull, Legs. ${lastSession ? 'Última sesión: ' + PROGRAM[lastSession.day].name + ', ' + relDay(lastSession.finishedAt) + '.' : 'Aún no has registrado ninguna sesión.'}</p>
     </div>`}
 `;
+  host.querySelectorAll('[data-deload]').forEach((b) => b.addEventListener('click', async () => {
+    const a = b.dataset.deload;
+    if (a === 'on') await setSetting('deload', { until: addDays(localDate(), 6) });
+    else if (a === 'off') { await setSetting('deload', null); await setSetting('lastDeload', localDate()); }
+    else await setSetting('deloadSnooze', addDays(localDate(), 7));
+    showToday();
+  }));
   const sync = document.getElementById('sleep-sync');
   if (sync) {
     preloadGis();
@@ -274,18 +327,22 @@ function relDay(iso) {
 }
 
 async function startSession(day, light = false) {
+  const dl = await deloadInfo();
+  if (dl.active) light = true;
   const variant = await programVariant();
   const items = sessionFor(day, variant);
   const sets = {};
   const targets = {};
-  session = { id: Date.now(), day, variant, light, targets, startedAt: new Date().toISOString(), idx: 0, ids: items.map((e) => e.id), sets, restEnd: null, restTotal: 0 };
+  session = { id: Date.now(), day, variant, light, deload: dl.active, targets, startedAt: new Date().toISOString(), idx: 0, ids: items.map((e) => e.id), sets, restEnd: null, restTotal: 0 };
   for (const ex of items) {
     const last = await lastTime(ex.id);
     const sug = await suggestion(ex.id, ex);
     if (sug) targets[ex.id] = sug;
+    const lower = (w) => (dl.active && ex.carga !== 'peso-corporal' && w !== '' ? Math.max(0, round25(w * 0.85)) : w);
+    if (dl.active && sug && ex.carga !== 'peso-corporal') targets[ex.id] = { kind: 'hold', weight: lower(sug.weight), text: `Descarga: ${fmtKg(lower(sug.weight))} kg, sin llegar al fallo` };
     sets[ex.id] = Array.from({ length: lightSets(ex, light) }, (_, i) => {
       const l = last && (last[i] || last[last.length - 1]);
-      return { w: sug && ex.carga !== 'peso-corporal' ? sug.weight : l ? l.weight : '', r: l ? l.reps : '', done: false };
+      return { w: lower(sug && ex.carga !== 'peso-corporal' ? sug.weight : l ? l.weight : ''), r: l ? l.reps : '', done: false };
     });
   }
   await persist();
@@ -334,6 +391,7 @@ async function showTrain() {
     </div>
     ${(session.targets || {})[id] ? `<div class="lastline target ${session.targets[id].kind}">${svg('<path d="M12 19V6M6 11l6-6 6 6"/>', 16, 2.4)}<span><strong>${esc(session.targets[id].text)}</strong></span></div>` : ''}
     ${last ? `<div class="lastline">${svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>', 16, 2)}<span>La última vez: <strong>${esc(last)}</strong></span></div>` : '<div class="lastline muted">Primera vez con este ejercicio: empieza con un peso que te deje 3-4 repeticiones en reserva.</div>'}
+    ${warmupHtml(id, sets)}
     <div style="display:flex;flex-direction:column;gap:10px" id="sets">
       ${sets.map((s, i) => `
         <div class="setrow ${s.done ? 'done' : ''}">
