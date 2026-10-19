@@ -1,7 +1,7 @@
 // Pantallas Hoy (sesión que toca) y Entrenar (registrar series con temporizador).
 import { del, getAll, getByIndex, getSetting, put, setSetting } from './db.js';
 import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } from './exercises.js';
-import { beep, esc, flashCard, fmtClock, keepAwake, localDate, releaseAwake, svg, toast, unlockAudio } from './util.js';
+import { beep, esc, flashCard, fmtClock, keepAwake, localDate, fmtTotal, releaseAwake, svg, toast, unlockAudio } from './util.js';
 import { suggestion } from './progress.js';
 import { LOW_SLEEP_MIN, preloadGis, syncSleep } from './fitbit.js';
 import { KINDS, getMark, openDaySheet, weekData, weekStripHtml, weekTip } from './week.js';
@@ -9,6 +9,10 @@ import { ROUTINES, doneToday, favorites, routineMinutes, startMobility, suggeste
 
 const DAYS = ['push', 'pull', 'legs'];
 const DEFAULT_REST = 90;
+// Descanso entre series según el tipo de ejercicio: los compuestos pesados piden más (2:30),
+// el aislamiento y el trabajo pequeño se recuperan antes (1:30).
+const SMALL = /aislamiento|tr[ií]ceps|b[ií]ceps|abdomen|antebrazo|lateral|gemelo|trasero/i;
+const restFor = (ex) => (SMALL.test(ex.muscle) || ex.reps[0] >= 12 ? 90 : 150);
 
 const fmtKg = (n) => String(n).replace('.', ',');
 const parseNum = (v) => parseFloat(String(v).replace(',', '.'));
@@ -309,7 +313,7 @@ async function showTrain() {
   const sets = session.sets[id];
   const last = lastLabel(await lastTime(id));
   const isLast = session.idx === session.ids.length - 1;
-  const rest = (await getSetting('restSeconds', DEFAULT_REST));
+  const rest = restFor(ex);
 
   host.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:10px">
@@ -349,6 +353,10 @@ async function showTrain() {
         <button class="mini" id="skip" style="flex:none">Saltar</button>
       </div>
       <div class="bar"><div id="rest-bar" style="width:0%"></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line, #E7DFD0);padding-top:8px">
+        <span class="eyebrow">Tiempo total</span>
+        <span id="total-time" style="font-size:20px;font-weight:800;font-variant-numeric:tabular-nums">${fmtTotal(Date.now() - new Date(session.startedAt))}</span>
+      </div>
     </div>
     <div style="flex-grow:1"></div>
     <div class="actions">
@@ -426,7 +434,7 @@ async function toggleSet(exId, i) {
     }
     s.done = true;
     await writeLog(exId, i);
-    const rest = await getSetting('restSeconds', DEFAULT_REST);
+    const rest = restFor(EXERCISES[exId]);
     session.restTotal = rest;
     session.restEnd = Date.now() + rest * 1000;
     if (await getSetting('restSound', true)) unlockAudio();
@@ -453,6 +461,8 @@ function stopTimer() {
 function tick() {
   const t = document.getElementById('rest-time');
   if (!t || !session) { stopTimer(); return; }
+  const tt = document.getElementById('total-time');
+  if (tt) tt.textContent = fmtTotal(Date.now() - new Date(session.startedAt));
   const el = document.getElementById('elapsed');
   if (el) el.textContent = elapsedMin() + ' min';
   const bar = document.getElementById('rest-bar');
@@ -471,7 +481,7 @@ async function endRest(alert) {
   if (!session) return;
   session.restEnd = null;
   persist();
-  const rest = await getSetting('restSeconds', DEFAULT_REST);
+  const rest = session.restTotal || DEFAULT_REST;
   const t = document.getElementById('rest-time');
   const bar = document.getElementById('rest-bar');
   if (t) { t.textContent = fmtClock(rest); t.classList.remove('live'); }

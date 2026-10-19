@@ -1,6 +1,6 @@
 // Movilidad diaria: rutinas rápidas (5-10 min) que van rotando entre caderas, espalda alta e isquios.
 import { getAll, getSetting, put, setSetting } from './db.js';
-import { beep, esc, flashCard, fmtClock, keepAwake, localDate, releaseAwake, svg, unlockAudio } from './util.js';
+import { beep, esc, flashCard, fmtClock, keepAwake, localDate, fmtTotal, releaseAwake, svg, unlockAudio } from './util.js';
 
 // hold = segundos que se mantiene; reps = repeticiones. side: palabra para "derecha/izquierda".
 export const MOB = {
@@ -174,6 +174,10 @@ function showEx() {
       ${finished ? '' : `<button class="mini" id="mob-go" style="flex:none;color:var(--green);border-color:var(--green)" ${timerRunning ? 'disabled' : ''}>
         ${ex.hold ? (timerRunning ? 'En marcha' : svg('<path d="M8 5.5v13l11-6.5z"/>', 16, 2, 'fill="currentColor"') + 'Iniciar') : svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 18, 3) + 'Hecha'}</button>`}
     </div>
+    <div class="card" style="flex-direction:row;align-items:baseline;justify-content:space-between;padding:10px 16px">
+      <span class="eyebrow">Tiempo total</span>
+      <span id="mob-total" style="font-size:20px;font-weight:800;font-variant-numeric:tabular-nums">${fmtTotal(Date.now() - run.startedAt)}</span>
+    </div>
     <div style="flex-grow:1"></div>
     <div class="actions">
       <button class="back-btn" id="mob-prev">${svg('<path d="M15 5l-7 7 7 7"/>', 20, 2.5)}Atrás</button>
@@ -201,13 +205,16 @@ function showEx() {
     run.idx += 1; run.step = 0; run.timer = null;
     showEx();
   });
-  if (timerRunning) tickId = setInterval(tick, 250);
+  tickId = setInterval(tick, 250);
   host.scrollTop = 0;
 }
 
 async function tick() {
+  const tot = document.getElementById('mob-total');
+  if (!run || !tot) { stopTick(); return; }
+  tot.textContent = fmtTotal(Date.now() - run.startedAt);
   const t = document.getElementById('mob-time');
-  if (!t || !run || !run.timer) { stopTick(); return; }
+  if (!t || !run.timer) return;
   const left = Math.max(0, Math.ceil((run.timer.end - Date.now()) / 1000));
   t.textContent = fmtClock(left);
   if (left === 0) {

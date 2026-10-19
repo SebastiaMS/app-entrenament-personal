@@ -109,3 +109,11 @@ export function openVideo(url) {
   dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });
   dlg.showModal();
 }
+
+// Cronómetro total: m:ss, o h:mm:ss a partir de la hora.
+export function fmtTotal(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  const p = (n) => String(n).padStart(2, '0');
+  return h ? `${h}:${p(m)}:${p(r)}` : `${m}:${p(r)}`;
+}
