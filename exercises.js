@@ -60,8 +60,8 @@ export const EXERCISES = {
     cues: ['Palmas mirando hacia dentro durante todo el movimiento.', 'Sube sin mover el codo hacia delante.', 'Evita balancearte para subir el peso.', 'Baja despacio hasta estirar el brazo.'] },
   'curl-polea': { video: 'https://www.youtube.com/watch?v=7Jc4jHxax60', name: 'Curl en polea', muscle: 'Bíceps', equip: 'Polea baja', carga: 'polea', sets: 3, reps: [10, 15],
     cues: ['Polea baja con barra recta o cuerda.', 'Codos pegados a los costados y quietos.', 'Sube hasta contraer el bíceps, sin echar el cuerpo hacia atrás.', 'Baja despacio manteniendo tensión.'] },
-  'curl-muneca-barra': { video: 'https://www.youtube.com/watch?v=s5lhlt5FeP4', name: 'Curl de muñeca con barra', muscle: 'Antebrazo', equip: 'Banco y barra', carga: 'barra', sets: 3, reps: [12, 20],
-    cues: ['Antebrazos apoyados sobre un banco o los muslos, palmas hacia arriba.', 'Deja que la barra baje hasta los dedos y sube enrollando la muñeca.', 'Mueve solo la muñeca, no el antebrazo.', 'Peso ligero y muchas repeticiones controladas.'] },
+  'curl-muneca-espalda': { video: 'https://www.youtube.com/watch?v=JKoQ9ej4UUQ', name: 'Curl de muñeca con barra por detrás', muscle: 'Antebrazo', equip: 'Barra', carga: 'barra', sets: 3, reps: [12, 20],
+    cues: ['De pie, con la barra por detrás del cuerpo, agarre con las palmas hacia atrás.', 'Deja que la barra baje hasta los dedos y sube enrollando solo las muñecas.', 'Brazos quietos y pegados al cuerpo.', 'Peso ligero y repeticiones controladas; si notas dolor en la muñeca, para.'] },
   'curl-inverso': { video: 'https://www.youtube.com/watch?v=10AFVfSUzsU', name: 'Curl inverso', muscle: 'Antebrazo y braquial', equip: 'Barra Z o mancuernas', carga: 'barra', sets: 3, reps: [10, 15],
     cues: ['Agarre con las palmas hacia abajo, a la anchura de los hombros.', 'Sube sin mover los codos de los costados.', 'Mantén las muñecas rectas.', 'Baja despacio; el peso será menor que en un curl normal.'] },
 
@@ -103,7 +103,7 @@ export const PROGRAM = {
     ['pajaros-mancuernas', 'face-pull'],
     ['curl-barra-z-scott', 'curl-alterno-mancuernas'],
     ['curl-martillo', 'curl-polea'],
-    ['curl-muneca-barra', 'curl-inverso']
+    ['curl-muneca-espalda', 'curl-inverso']
   ] },
   legs: { name: 'Legs', slots: [
     ['prensa-45', 'prensa-45'],

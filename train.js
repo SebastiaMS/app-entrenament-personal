@@ -109,7 +109,11 @@ export async function renderToday(container, h) {
   host = container;
   hooks = h || {};
   session = await getSetting('activeSession');
-  if (session && session.ids.includes('pec-deck-inverso')) { // ejercicio retirado: lo sustituyen los pájaros con mancuernas
+  if (session && (session.ids.includes('pec-deck-inverso') || session.ids.includes('curl-muneca-barra'))) {
+    const old2 = 'curl-muneca-barra', new2 = 'curl-muneca-espalda';
+    session.ids = session.ids.map((x) => (x === old2 ? new2 : x));
+    if (session.sets[old2]) { session.sets[new2] = session.sets[old2]; delete session.sets[old2]; }
+    if (session.targets && session.targets[old2]) { session.targets[new2] = session.targets[old2]; delete session.targets[old2]; } // ejercicio retirado: lo sustituyen los pájaros con mancuernas
     const o = 'pec-deck-inverso', n = 'pajaros-mancuernas';
     session.ids = session.ids.map((x) => (x === o ? n : x));
     if (session.sets[o]) { session.sets[n] = session.sets[o]; delete session.sets[o]; }
