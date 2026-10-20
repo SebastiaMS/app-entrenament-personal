@@ -109,6 +109,13 @@ export async function renderToday(container, h) {
   host = container;
   hooks = h || {};
   session = await getSetting('activeSession');
+  if (session && session.ids.includes('pec-deck-inverso')) { // ejercicio retirado: lo sustituyen los pájaros con mancuernas
+    const o = 'pec-deck-inverso', n = 'pajaros-mancuernas';
+    session.ids = session.ids.map((x) => (x === o ? n : x));
+    if (session.sets[o]) { session.sets[n] = session.sets[o]; delete session.sets[o]; }
+    if (session.targets && session.targets[o]) { session.targets[n] = session.targets[o]; delete session.targets[o]; }
+    await setSetting('activeSession', session);
+  }
   if (session && view === 'today' && !resumed) {
     resumed = true;
     // si la app se cerró en mitad del entreno, se retoma donde estaba
