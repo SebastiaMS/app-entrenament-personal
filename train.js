@@ -273,6 +273,9 @@ async function showToday() {
            <button class="btn" id="discard" style="flex:none;min-height:44px;color:var(--coral);border-color:#E8B8B2">Descartar sesión</button>`
         : `<button class="btn primary" id="go" style="flex:none">${svg('<path d="M8 5.5v13l11-6.5z"/>', 18, 2, 'fill="#fff" stroke="#fff"')}Empezar sesión</button>`}
     </div>`}
+    ${!session && lastSession && lastSession.finishedAt && localDate(new Date(lastSession.finishedAt)) === localDate()
+      ? `<div class="card"><span class="eyebrow">Sesión de hoy terminada</span><p>¿Te dejaste algún ejercicio o quieres corregir una serie?</p>
+         <button class="btn" id="reopen-today" style="flex:none;min-height:48px">Reabrir la sesión de hoy</button></div>` : ''}
     ${session || gate ? '' : `
     <div class="card">
       <span class="eyebrow">¿Otro día?</span>
@@ -316,6 +319,8 @@ async function showToday() {
   document.getElementById('mob-start').addEventListener('click', () => {
     startMobility(host, hooks, routineId, () => { pickedRoutine = null; showToday(); });
   });
+  const ro = document.getElementById('reopen-today');
+  if (ro) ro.addEventListener('click', () => reopenSession(lastSession));
   const goBtn = document.getElementById('go');
   if (goBtn) goBtn.addEventListener('click', async () => {
     if (!session) await startSession(day, light);
@@ -358,6 +363,65 @@ async function startSession(day, light = false) {
     });
   }
   await persist();
+}
+
+// Series de partida de un ejercicio: objetivo de progresión, última vez o valores iniciales.
+async function initialSets(ex) {
+  const last = await lastTime(ex.id);
+  const sug = await suggestion(ex.id, ex);
+  const n = ex.sets;
+  const sets = Array.from({ length: n }, (_, i) => {
+    const l = last && (last[i] || last[last.length - 1]);
+    const st = !sug && !l && ex.start ? ex.start : null;
+    return { w: st ? st.w : sug && ex.carga !== 'peso-corporal' ? sug.weight : l ? l.weight : '', r: st ? st.r : l ? l.reps : '', done: false };
+  });
+  return { sets, sug };
+}
+
+// Añade un ejercicio al final de la sesión en curso y se va a él.
+async function addExercise(id) {
+  if (!session.ids.includes(id)) {
+    const ex = { id, ...EXERCISES[id] };
+    const { sets, sug } = await initialSets(ex);
+    session.ids.push(id);
+    session.sets[id] = sets;
+    if (sug) session.targets[id] = sug;
+  }
+  session.idx = session.ids.indexOf(id);
+  await persist();
+  showTrain();
+}
+
+function pickExerciseDialog() {
+  const dlg = document.createElement('dialog');
+  const groups = DAYS.map((d) => {
+    const ids = [...new Set(PROGRAM[d].slots.flat())].filter((x) => EXERCISES[x] && !session.ids.includes(x));
+    return `<h3 style="margin:10px 0 4px;font-size:15px">${PROGRAM[d].name}</h3>` + ids.map((x) => `<button class="item" data-add="${x}" style="min-height:44px;width:100%;background:none;border:none;border-bottom:1px solid var(--line);font-family:inherit;font-size:15px;text-align:left;cursor:pointer"><span>${esc(EXERCISES[x].name)}</span><span class="muted small">${esc(EXERCISES[x].muscle)}</span></button>`).join('');
+  }).join('');
+  dlg.innerHTML = `<h2>Añadir ejercicio</h2><p>Se añade al final de la sesión de hoy.</p><div style="max-height:55vh;overflow:auto">${groups}</div>
+    <button class="btn" id="add-cancel" style="flex:none;min-height:48px;margin-top:10px">Cancelar</button>`;
+  document.body.appendChild(dlg);
+  const close = () => { dlg.close(); dlg.remove(); };
+  dlg.addEventListener('cancel', () => dlg.remove());
+  dlg.querySelector('#add-cancel').addEventListener('click', close);
+  dlg.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', async () => { close(); await addExercise(b.dataset.add); }));
+  dlg.showModal();
+}
+
+// Reabre una sesión terminada (para añadir un ejercicio olvidado o corregir series).
+async function reopenSession(rec) {
+  const sets = {};
+  const targets = {};
+  for (const id of rec.ids) {
+    const rows = (await getByIndex('logs', 'exerciseId', id)).filter((r) => r.sessionId === rec.id).sort((a, b) => a.setIndex - b.setIndex);
+    const ex = { id, ...EXERCISES[id] };
+    sets[id] = rows.length ? rows.map((r) => ({ w: r.weight, r: r.reps, done: true })) : (await initialSets(ex)).sets;
+  }
+  session = { id: rec.id, day: rec.day, variant: rec.variant, light: false, targets, startedAt: rec.startedAt, idx: rec.ids.length - 1, ids: [...rec.ids], sets, restEnd: null, restTotal: 0 };
+  await persist();
+  summary = null;
+  view = 'train';
+  showTrain();
 }
 
 async function discardSession() {
@@ -412,7 +476,10 @@ async function showTrain() {
           <label class="inp rp"><input inputmode="numeric" enterkeyhint="done" autocomplete="off" aria-label="Repeticiones de la serie ${i + 1}" data-k="r" data-i="${i}" value="${s.r}" placeholder="0"><span>rep</span></label>
           <button class="hecha" data-toggle="${i}" aria-pressed="${s.done}">${s.done ? svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 18, 3) : ''}Hecha</button>
         </div>`).join('')}
-      <button class="mini" id="add-set" style="align-self:flex-start">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.5)}Añadir serie</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="mini" id="add-set" style="flex:none">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.5)}Añadir serie</button>
+        <button class="mini" id="add-ex" style="flex:none">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.5)}Añadir ejercicio</button>
+      </div>
     </div>
     <div class="card" style="gap:10px;padding:14px 16px">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -464,6 +531,7 @@ async function showTrain() {
     await persist();
     showTrain();
   });
+  document.getElementById('add-ex').addEventListener('click', pickExerciseDialog);
   document.getElementById('skip').addEventListener('click', () => { endRest(false); });
   document.getElementById('prev').addEventListener('click', async () => {
     if (session.idx === 0) { view = 'today'; showToday(); return; }
@@ -604,6 +672,8 @@ function showDone() {
     </div>
     ${summary.ups && summary.ups.length ? `<div class="card"><span class="eyebrow">Próxima vez subes</span><div class="list" style="gap:0">${summary.ups.map((u) => `<div class="item" style="min-height:44px;font-size:15px"><span>${esc(u.name)}</span></div><div class="muted small" style="padding:0 0 8px">${esc(u.text)}</div>`).join('')}</div></div>` : ''}
     <div style="flex-grow:1"></div>
+    <button class="btn" id="reopen" style="flex:none">¿Falta algo? Reabrir la sesión</button>
     <button class="btn primary" id="back-today" style="flex:none">Volver a Hoy</button>`;
+  document.getElementById('reopen').addEventListener('click', () => reopenSession(summary));
   document.getElementById('back-today').addEventListener('click', () => { summary = null; view = 'today'; showToday(); });
 }
