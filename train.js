@@ -270,12 +270,9 @@ async function showToday() {
       </div>
       ${session
         ? `<button class="btn primary" id="go" style="flex:none">Continuar sesión</button>
-           <button class="btn" id="discard" style="flex:none;min-height:44px;color:var(--coral);border-color:#E8B8B2">Descartar sesión</button>`
+           ${session.reopened ? '' : '<button class="btn" id="discard" style="flex:none;min-height:44px;color:var(--coral);border-color:#E8B8B2">Descartar sesión</button>'}`
         : `<button class="btn primary" id="go" style="flex:none">${svg('<path d="M8 5.5v13l11-6.5z"/>', 18, 2, 'fill="#fff" stroke="#fff"')}Empezar sesión</button>`}
     </div>`}
-    ${!session && lastSession && lastSession.finishedAt && localDate(new Date(lastSession.finishedAt)) === localDate()
-      ? `<div class="card"><span class="eyebrow">Sesión de hoy terminada</span><p>¿Te dejaste algún ejercicio o quieres corregir una serie?</p>
-         <button class="btn" id="reopen-today" style="flex:none;min-height:48px">Reabrir la sesión de hoy</button></div>` : ''}
     ${session || gate ? '' : `
     <div class="card">
       <span class="eyebrow">¿Otro día?</span>
@@ -319,8 +316,6 @@ async function showToday() {
   document.getElementById('mob-start').addEventListener('click', () => {
     startMobility(host, hooks, routineId, () => { pickedRoutine = null; showToday(); });
   });
-  const ro = document.getElementById('reopen-today');
-  if (ro) ro.addEventListener('click', () => reopenSession(lastSession));
   const goBtn = document.getElementById('go');
   if (goBtn) goBtn.addEventListener('click', async () => {
     if (!session) await startSession(day, light);
@@ -409,6 +404,17 @@ function pickExerciseDialog() {
 }
 
 // Reabre una sesión terminada (para añadir un ejercicio olvidado o corregir series).
+let returnTo = null; // al terminar una edición desde el Historial, vuelve allí
+export async function editSession(container, h, rec, back) {
+  host = container;
+  hooks = h || {};
+  const active = await getSetting('activeSession');
+  if (active) { toast('Primero termina o descarta la sesión en curso (pestaña Hoy).'); return false; }
+  returnTo = back || null;
+  await reopenSession(rec);
+  return true;
+}
+
 async function reopenSession(rec) {
   const sets = {};
   const targets = {};
@@ -417,7 +423,7 @@ async function reopenSession(rec) {
     const ex = { id, ...EXERCISES[id] };
     sets[id] = rows.length ? rows.map((r) => ({ w: r.weight, r: r.reps, done: true })) : (await initialSets(ex)).sets;
   }
-  session = { id: rec.id, day: rec.day, variant: rec.variant, light: false, targets, startedAt: rec.startedAt, idx: rec.ids.length - 1, ids: [...rec.ids], sets, restEnd: null, restTotal: 0 };
+  session = { id: rec.id, day: rec.day, variant: rec.variant, light: false, reopened: true, finishedAt: rec.finishedAt, targets, startedAt: rec.startedAt, idx: rec.ids.length - 1, ids: [...rec.ids], sets, restEnd: null, restTotal: 0 };
   await persist();
   summary = null;
   view = 'train';
@@ -452,7 +458,7 @@ async function showTrain() {
     <div style="display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span class="eyebrow">${PROGRAM[session.day].name} · ejercicio ${session.idx + 1} de ${session.ids.length}</span>
-        <span class="muted small" id="elapsed">${elapsedMin()} min</span>
+        ${session.reopened ? '' : `<span class="muted small" id="elapsed">${elapsedMin()} min</span>`}
       </div>
       <div class="seg">${session.ids.map((_, i) => `<i class="${i <= session.idx ? 'on' : ''}"></i>`).join('')}</div>
     </div>
@@ -490,10 +496,10 @@ async function showTrain() {
         <button class="mini" id="skip" style="flex:none">Saltar</button>
       </div>
       <div class="bar"><div id="rest-bar" style="width:0%"></div></div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line, #E7DFD0);padding-top:8px">
+      ${session.reopened ? '' : `<div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line, #E7DFD0);padding-top:8px">
         <span class="eyebrow">Tiempo total</span>
         <span id="total-time" style="font-size:20px;font-weight:800;font-variant-numeric:tabular-nums">${fmtTotal(Date.now() - new Date(session.startedAt))}</span>
-      </div>
+      </div>`}
     </div>
     <div style="flex-grow:1"></div>
     <div class="actions">
@@ -534,7 +540,12 @@ async function showTrain() {
   document.getElementById('add-ex').addEventListener('click', pickExerciseDialog);
   document.getElementById('skip').addEventListener('click', () => { endRest(false); });
   document.getElementById('prev').addEventListener('click', async () => {
-    if (session.idx === 0) { view = 'today'; showToday(); return; }
+    if (session.idx === 0) {
+      view = 'today';
+      if (session.reopened) { await persist(); const r = returnTo; returnTo = null; if (r) return r(); }
+      showToday();
+      return;
+    }
     session.idx -= 1;
     await persist();
     showTrain();
@@ -640,10 +651,10 @@ document.addEventListener('visibilitychange', () => {
 async function finishSession() {
   const setsDone = Object.values(session.sets).flat().filter((s) => s.done).length;
   if (setsDone === 0 && !confirm('No has marcado ninguna serie como hecha. ¿Terminar la sesión igualmente?')) return;
-  const finishedAt = new Date().toISOString();
+  const finishedAt = session.finishedAt || new Date().toISOString();
   const rec = { id: session.id, day: session.day, variant: session.variant, startedAt: session.startedAt, finishedAt, setsDone, ids: session.ids };
   await put('sessions', rec);
-  await setSetting('lastDay', session.day);
+  if (!session.reopened) await setSetting('lastDay', session.day);
   const ups = [];
   for (const id of rec.ids) {
     const sg = await suggestion(id, EXERCISES[id]);
@@ -672,8 +683,6 @@ function showDone() {
     </div>
     ${summary.ups && summary.ups.length ? `<div class="card"><span class="eyebrow">Próxima vez subes</span><div class="list" style="gap:0">${summary.ups.map((u) => `<div class="item" style="min-height:44px;font-size:15px"><span>${esc(u.name)}</span></div><div class="muted small" style="padding:0 0 8px">${esc(u.text)}</div>`).join('')}</div></div>` : ''}
     <div style="flex-grow:1"></div>
-    <button class="btn" id="reopen" style="flex:none">¿Falta algo? Reabrir la sesión</button>
     <button class="btn primary" id="back-today" style="flex:none">Volver a Hoy</button>`;
-  document.getElementById('reopen').addEventListener('click', () => reopenSession(summary));
-  document.getElementById('back-today').addEventListener('click', () => { summary = null; view = 'today'; showToday(); });
+  document.getElementById('back-today').addEventListener('click', () => { summary = null; view = 'today'; if (returnTo) { const r = returnTo; returnTo = null; r(); } else showToday(); });
 }

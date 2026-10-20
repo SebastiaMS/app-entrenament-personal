@@ -1,4 +1,5 @@
 // Historial: evolución, mejor marca y sesiones de cada ejercicio, con tus series reales.
+import { editSession } from './train.js';
 import { getAll, getByIndex } from './db.js';
 import { EXERCISES, PROGRAM } from './exercises.js';
 import { esc, localDate, svg, toast } from './util.js';
@@ -321,12 +322,14 @@ function drawWorkouts(sessions, logs) {
         <button class="btn primary" id="w-copy" style="min-height:48px">Copiar entreno</button>
         ${navigator.share ? '<button class="btn" id="w-share" style="min-height:48px">Compartir</button>' : ''}
       </div>
+      <button class="btn" id="w-edit" style="flex:none;min-height:48px">Editar o añadir ejercicios</button>
     </div>
     ${ex.map((e) => `<div class="card"><span style="font-size:17px;font-weight:800">${esc(e.name)}</span>
       <div class="list" style="gap:0">${e.sets.map((x, i) => `<div class="item" style="min-height:40px;font-size:15px"><span class="muted">Serie ${i + 1}</span><span style="font-weight:800">${setText(e, x)}</span></div>`).join('')}</div></div>`).join('')}`;
   bindMode();
   document.getElementById('w-back').addEventListener('click', () => { state.wSel = null; renderHistory(host); });
   document.getElementById('w-copy').addEventListener('click', async () => toast((await copyText(text)) ? 'Entreno copiado' : 'No se pudo copiar'));
+  document.getElementById('w-edit').addEventListener('click', () => editSession(host, { immersive: (on) => { const n = document.getElementById('nav'); if (n) n.style.display = on ? 'none' : ''; } }, s, () => { const n = document.getElementById('nav'); if (n) n.style.display = ''; renderHistory(host); }));
   const sh = document.getElementById('w-share');
   if (sh) sh.addEventListener('click', () => navigator.share({ title: 'Entreno', text }).catch(() => {}));
 }
