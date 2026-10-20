@@ -112,7 +112,7 @@ export async function renderToday(container, h) {
   if (session && (session.ids.includes('pec-deck-inverso') || session.ids.includes('curl-muneca-barra'))) {
     const old2 = 'curl-muneca-barra', new2 = 'curl-muneca-espalda';
     session.ids = session.ids.map((x) => (x === old2 ? new2 : x));
-    if (session.sets[old2]) { session.sets[new2] = session.sets[old2]; delete session.sets[old2]; }
+    if (session.sets[old2]) { session.sets[new2] = session.sets[old2].map((x) => (x.done || x.w !== '' ? x : { ...x, w: 17.5, r: 15 })); delete session.sets[old2]; }
     if (session.targets && session.targets[old2]) { session.targets[new2] = session.targets[old2]; delete session.targets[old2]; } // ejercicio retirado: lo sustituyen los pájaros con mancuernas
     const o = 'pec-deck-inverso', n = 'pajaros-mancuernas';
     session.ids = session.ids.map((x) => (x === o ? n : x));
@@ -353,7 +353,8 @@ async function startSession(day, light = false) {
     if (dl.active && sug && ex.carga !== 'peso-corporal') targets[ex.id] = { kind: 'hold', weight: lower(sug.weight), text: `Descarga: ${fmtKg(lower(sug.weight))} kg, sin llegar al fallo` };
     sets[ex.id] = Array.from({ length: lightSets(ex, light) }, (_, i) => {
       const l = last && (last[i] || last[last.length - 1]);
-      return { w: lower(sug && ex.carga !== 'peso-corporal' ? sug.weight : l ? l.weight : ''), r: l ? l.reps : '', done: false };
+      const st = !sug && !l && ex.start ? ex.start : null; // primera vez: valores de partida del ejercicio
+      return { w: st ? st.w : lower(sug && ex.carga !== 'peso-corporal' ? sug.weight : l ? l.weight : ''), r: st ? st.r : l ? l.reps : '', done: false };
     });
   }
   await persist();
