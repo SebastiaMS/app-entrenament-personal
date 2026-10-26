@@ -3,6 +3,7 @@ import { del, getAll, getByIndex, getSetting, put, setSetting } from './db.js';
 import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } from './exercises.js';
 import { beep, esc, flashCard, fmtClock, keepAwake, localDate, fmtTotal, releaseAwake, svg, toast, unlockAudio } from './util.js';
 import { suggestion } from './progress.js';
+import { bodyKg, startingWeight } from './starting.js';
 import { LOW_SLEEP_MIN, preloadGis, syncSleep } from './fitbit.js';
 import { KINDS, getMark, openDaySheet, weekData, weekStripHtml, weekTip } from './week.js';
 import { ROUTINES, doneToday, favorites, routineMinutes, startMobility, suggestedRoutine, toggleFavorite } from './mobility.js';
@@ -347,7 +348,8 @@ async function startSession(day, light = false) {
   session = { id: Date.now(), day, variant, light, deload: dl.active, targets, startedAt: new Date().toISOString(), idx: 0, ids: items.map((e) => e.id), sets, restEnd: null, restTotal: 0 };
   for (const ex of items) {
     const last = await lastTime(ex.id);
-    const sug = await suggestion(ex.id, ex);
+    let sug = await suggestion(ex.id, ex);
+    if (!sug && !last) sug = await firstTimeTarget(ex);
     if (sug) targets[ex.id] = sug;
     const lower = (w) => (dl.active && ex.carga !== 'peso-corporal' && w !== '' ? Math.max(0, round25(w * 0.85)) : w);
     if (dl.active && sug && ex.carga !== 'peso-corporal') targets[ex.id] = { kind: 'hold', weight: lower(sug.weight), text: `Descarga: ${fmtKg(lower(sug.weight))} kg, sin llegar al fallo` };
@@ -360,10 +362,19 @@ async function startSession(day, light = false) {
   await persist();
 }
 
+// Primera vez con un ejercicio: peso orientativo según tu peso corporal.
+async function firstTimeTarget(ex) {
+  if (ex.start || ex.carga === 'peso-corporal') return null;
+  const w = startingWeight(ex.id, await bodyKg());
+  if (!w) return null;
+  return { kind: 'hold', weight: w, first: true, text: `Primera vez: prueba con unos ${fmtKg(w)} kg${ex.carga === 'mancuerna' ? ' en cada mano' : ''} y ajusta hasta dejar 3-4 reps en reserva` };
+}
+
 // Series de partida de un ejercicio: objetivo de progresión, última vez o valores iniciales.
 async function initialSets(ex) {
   const last = await lastTime(ex.id);
-  const sug = await suggestion(ex.id, ex);
+  let sug = await suggestion(ex.id, ex);
+  if (!sug && !last) sug = await firstTimeTarget(ex);
   const n = ex.sets;
   const sets = Array.from({ length: n }, (_, i) => {
     const l = last && (last[i] || last[last.length - 1]);
@@ -387,23 +398,66 @@ async function addExercise(id) {
   showTrain();
 }
 
-function pickExerciseDialog() {
+function pickExerciseDialog(opts = {}) {
+  const { title = 'Añadir ejercicio', note = 'Se añade al final de la sesión de hoy.', onPick = addExercise, similarTo = null } = opts;
   const dlg = document.createElement('dialog');
-  const groups = DAYS.map((d) => {
+  const muscleKey = (id) => (EXERCISES[id].muscle.split(/[ (]/)[0] || '').toLowerCase();
+  const similar = similarTo ? Object.keys(EXERCISES).filter((x) => x !== similarTo && !session.ids.includes(x) && muscleKey(x) === muscleKey(similarTo)) : [];
+  const item = (x) => `<button class="item" data-add="${x}" style="min-height:44px;width:100%;background:none;border:none;border-bottom:1px solid var(--line);font-family:inherit;font-size:15px;text-align:left;cursor:pointer"><span>${esc(EXERCISES[x].name)}</span><span class="muted small">${esc(EXERCISES[x].muscle)}</span></button>`;
+  const groups = (similar.length ? `<h3 style="margin:10px 0 4px;font-size:15px">Del mismo músculo</h3>${similar.map(item).join('')}` : '') + DAYS.map((d) => {
     const ids = [...new Set(PROGRAM[d].slots.flat())].filter((x) => EXERCISES[x] && !session.ids.includes(x));
-    return `<h3 style="margin:10px 0 4px;font-size:15px">${PROGRAM[d].name}</h3>` + ids.map((x) => `<button class="item" data-add="${x}" style="min-height:44px;width:100%;background:none;border:none;border-bottom:1px solid var(--line);font-family:inherit;font-size:15px;text-align:left;cursor:pointer"><span>${esc(EXERCISES[x].name)}</span><span class="muted small">${esc(EXERCISES[x].muscle)}</span></button>`).join('');
+    return `<h3 style="margin:10px 0 4px;font-size:15px">${PROGRAM[d].name}</h3>` + ids.filter((x) => !similar.includes(x) && x !== similarTo).map(item).join('');
   }).join('');
-  dlg.innerHTML = `<h2>Añadir ejercicio</h2><p>Se añade al final de la sesión de hoy.</p><div style="max-height:55vh;overflow:auto">${groups}</div>
+  dlg.innerHTML = `<h2>${esc(title)}</h2><p>${esc(note)}</p><div style="max-height:55vh;overflow:auto">${groups}</div>
     <button class="btn" id="add-cancel" style="flex:none;min-height:48px;margin-top:10px">Cancelar</button>`;
   document.body.appendChild(dlg);
   const close = () => { dlg.close(); dlg.remove(); };
   dlg.addEventListener('cancel', () => dlg.remove());
   dlg.querySelector('#add-cancel').addEventListener('click', close);
-  dlg.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', async () => { close(); await addExercise(b.dataset.add); }));
+  dlg.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', async () => { close(); await onPick(b.dataset.add); }));
   dlg.showModal();
 }
 
 // Reabre una sesión terminada (para añadir un ejercicio olvidado o corregir series).
+async function dropLogs(exId) {
+  const rows = await getByIndex('logs', 'exerciseId', exId);
+  for (const r of rows) if (r.sessionId === session.id) await del('logs', r.id);
+}
+const doneCount = (id) => session.sets[id].filter((s) => s.done).length;
+
+async function swapExercise(newId) {
+  const old = session.ids[session.idx];
+  await dropLogs(old);
+  const ex = { id: newId, ...EXERCISES[newId] };
+  const { sets, sug } = await initialSets(ex);
+  delete session.sets[old];
+  if (session.targets) delete session.targets[old];
+  session.ids[session.idx] = newId;
+  session.sets[newId] = sets;
+  if (sug) session.targets[newId] = sug;
+  await persist();
+  showTrain();
+}
+
+function askSwap() {
+  const old = session.ids[session.idx];
+  if (doneCount(old) && !confirm('Este ejercicio ya tiene series hechas: se borrarán al cambiarlo. ¿Seguir?')) return;
+  pickExerciseDialog({ title: 'Cambiar ejercicio', note: 'Sustituye a ' + EXERCISES[old].name + ' en esta sesión.', onPick: swapExercise, similarTo: old });
+}
+
+async function removeExercise() {
+  if (session.ids.length <= 1) { toast('La sesión necesita al menos un ejercicio.'); return; }
+  const id = session.ids[session.idx];
+  if (!confirm(`¿Quitar "${EXERCISES[id].name}" de la sesión?${doneCount(id) ? ' Se borrarán sus series hechas.' : ''}`)) return;
+  await dropLogs(id);
+  session.ids.splice(session.idx, 1);
+  delete session.sets[id];
+  if (session.targets) delete session.targets[id];
+  session.idx = Math.min(session.idx, session.ids.length - 1);
+  await persist();
+  showTrain();
+}
+
 let returnTo = null; // al terminar una edición desde el Historial, vuelve allí
 export async function editSession(container, h, rec, back) {
   host = container;
@@ -472,7 +526,7 @@ async function showTrain() {
       <a class="mini" href="${videoUrl(id)}" target="_blank" rel="noopener">${svg('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10.5 9.5l4 2.5-4 2.5z"/>', 18, 2)}Ver vídeo</a>
     </div>
     ${(session.targets || {})[id] ? `<div class="lastline target ${session.targets[id].kind}">${svg('<path d="M12 19V6M6 11l6-6 6 6"/>', 16, 2.4)}<span><strong>${esc(session.targets[id].text)}</strong></span></div>` : ''}
-    ${last ? `<div class="lastline">${svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>', 16, 2)}<span>La última vez: <strong>${esc(last)}</strong></span></div>` : '<div class="lastline muted">Primera vez con este ejercicio: empieza con un peso que te deje 3-4 repeticiones en reserva.</div>'}
+    ${last ? `<div class="lastline">${svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>', 16, 2)}<span>La última vez: <strong>${esc(last)}</strong></span></div>` : ((session.targets || {})[id] ? '' : '<div class="lastline muted">Primera vez con este ejercicio: empieza con un peso que te deje 3-4 repeticiones en reserva.</div>')}
     ${warmupHtml(id, sets)}
     <div style="display:flex;flex-direction:column;gap:10px" id="sets">
       ${sets.map((s, i) => `
@@ -485,6 +539,8 @@ async function showTrain() {
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="mini" id="add-set" style="flex:none">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.5)}Añadir serie</button>
         <button class="mini" id="add-ex" style="flex:none">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.5)}Añadir ejercicio</button>
+        <button class="mini" id="swap-ex" style="flex:none">${svg('<path d="M7 7h11l-3-3M17 17H6l3 3"/>', 16, 2.2)}Cambiar ejercicio</button>
+        <button class="mini" id="del-ex" style="flex:none;color:var(--coral);border-color:#E8B8B2">${svg('<path d="M6 6l12 12M18 6L6 18"/>', 16, 2.5)}Quitar ejercicio</button>
       </div>
     </div>
     <div class="card" style="gap:10px;padding:14px 16px">
@@ -537,7 +593,9 @@ async function showTrain() {
     await persist();
     showTrain();
   });
-  document.getElementById('add-ex').addEventListener('click', pickExerciseDialog);
+  document.getElementById('add-ex').addEventListener('click', () => pickExerciseDialog());
+  document.getElementById('swap-ex').addEventListener('click', askSwap);
+  document.getElementById('del-ex').addEventListener('click', removeExercise);
   document.getElementById('skip').addEventListener('click', () => { endRest(false); });
   document.getElementById('prev').addEventListener('click', async () => {
     if (session.idx === 0) {
