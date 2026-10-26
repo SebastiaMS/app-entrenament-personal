@@ -1,6 +1,6 @@
 // Historial: evolución, mejor marca y sesiones de cada ejercicio, con tus series reales.
 import { editSession } from './train.js';
-import { getAll, getByIndex } from './db.js';
+import { del, getAll, getByIndex, put } from './db.js';
 import { EXERCISES, PROGRAM } from './exercises.js';
 import { esc, localDate, svg, toast } from './util.js';
 
@@ -324,11 +324,19 @@ function drawWorkouts(sessions, logs) {
       </div>
       <button class="btn" id="w-edit" style="flex:none;min-height:48px">Editar o añadir ejercicios</button>
     </div>
-    ${ex.map((e) => `<div class="card"><span style="font-size:17px;font-weight:800">${esc(e.name)}</span>
+    ${ex.map((e) => `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:17px;font-weight:800">${esc(e.name)}</span><button class="mini" data-rm="${esc(e.id)}" style="flex:none;min-height:36px;padding:0 10px;color:var(--coral);border-color:#E8B8B2">Quitar</button></div>
       <div class="list" style="gap:0">${e.sets.map((x, i) => `<div class="item" style="min-height:40px;font-size:15px"><span class="muted">Serie ${i + 1}</span><span style="font-weight:800">${setText(e, x)}</span></div>`).join('')}</div></div>`).join('')}`;
   bindMode();
   document.getElementById('w-back').addEventListener('click', () => { state.wSel = null; renderHistory(host); });
   document.getElementById('w-copy').addEventListener('click', async () => toast((await copyText(text)) ? 'Entreno copiado' : 'No se pudo copiar'));
+  host.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', async () => {
+    const id = b.dataset.rm;
+    if (!confirm('¿Quitar este ejercicio del entreno? Se borrarán sus series.')) return;
+    for (const r of logs.filter((l) => l.sessionId === s.id && l.exerciseId === id)) await del('logs', r.id);
+    await put('sessions', { ...s, ids: (s.ids || []).filter((x) => x !== id) });
+    toast('Ejercicio quitado');
+    renderHistory(host);
+  }));
   document.getElementById('w-edit').addEventListener('click', () => editSession(host, { immersive: (on) => { const n = document.getElementById('nav'); if (n) n.style.display = on ? 'none' : ''; } }, s, () => { const n = document.getElementById('nav'); if (n) n.style.display = ''; renderHistory(host); }));
   const sh = document.getElementById('w-share');
   if (sh) sh.addEventListener('click', () => navigator.share({ title: 'Entreno', text }).catch(() => {}));

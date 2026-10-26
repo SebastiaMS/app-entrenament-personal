@@ -446,7 +446,7 @@ function askSwap() {
 }
 
 async function removeExercise() {
-  if (session.ids.length <= 1) { toast('La sesión necesita al menos un ejercicio.'); return; }
+  if (session.ids.length <= 1) { alert('La sesión necesita al menos un ejercicio. Si quieres borrarla entera, quita antes el resto o usa otro ejercicio con "Cambiar ejercicio".'); return; }
   const id = session.ids[session.idx];
   if (!confirm(`¿Quitar "${EXERCISES[id].name}" de la sesión?${doneCount(id) ? ' Se borrarán sus series hechas.' : ''}`)) return;
   await dropLogs(id);
@@ -469,7 +469,19 @@ export async function editSession(container, h, rec, back) {
   return true;
 }
 
+// Ejercicios que cambié de nombre: los entrenos antiguos con estos ids se pasan a los nuevos.
+const LEGACY = { 'pec-deck-inverso': 'pajaros-mancuernas', 'curl-muneca-barra': 'curl-muneca-espalda' };
+
 async function reopenSession(rec) {
+  const ids = [];
+  for (const old of rec.ids) {
+    const id = LEGACY[old] || old;
+    if (id !== old) {
+      for (const r of await getByIndex('logs', 'exerciseId', old)) if (r.sessionId === rec.id) { await del('logs', r.id); await put('logs', { ...r, id: `${r.sessionId}-${id}-${r.setIndex}`, exerciseId: id }); }
+    }
+    if (EXERCISES[id] && !ids.includes(id)) ids.push(id); // ids que ya no existen se ignoran
+  }
+  rec = { ...rec, ids };
   const sets = {};
   const targets = {};
   for (const id of rec.ids) {
