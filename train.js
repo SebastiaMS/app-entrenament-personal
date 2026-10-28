@@ -558,7 +558,7 @@ async function showTrain() {
     <div class="card" style="gap:10px;padding:14px 16px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="display:flex;flex-direction:column;gap:2px">
-          <span class="eyebrow">Descanso</span>
+          <span class="eyebrow">Descanso · ${rest === 150 ? 'ejercicio pesado' : 'ejercicio ligero'}</span>
           <span id="rest-time" style="font-size:34px;font-weight:800;line-height:1">${fmtClock(rest)}</span>
         </div>
         <button class="mini" id="skip" style="flex:none">Saltar</button>
