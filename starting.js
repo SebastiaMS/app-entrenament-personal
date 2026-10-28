@@ -12,7 +12,7 @@ export const RATIO = {
   'jalon-pecho': 0.50, 'jalon-convergente': 0.45, 'remo-sentado-polea': 0.45, 'remo-maquina': 0.40,
   'remo-mancuerna-banco': 0.17, 'remo-t-apoyo-pecho': 0.25, 'pajaros-mancuernas': 0.05, 'face-pull': 0.15,
   'curl-barra-z-scott': 0.20, 'curl-alterno-mancuernas': 0.09, 'curl-martillo': 0.10, 'curl-polea': 0.22,
-  'curl-muneca-espalda': 0.21, 'curl-inverso': 0.15,
+  'curl-muneca-espalda': 0.21, 'curl-inverso': 0.15, 'curl-martillo-cuerda': 0.18,
   'prensa-45': 0.80, 'sentadilla-articulada': 0.45, 'curl-femoral-tumbado': 0.30, 'extension-cuadriceps': 0.35,
   'hip-thrust-maquina': 0.60, 'peso-muerto-rumano-mancuernas': 0.20, 'zancadas-mancuernas': 0.14, 'gemelos-sentado': 0.60
 };

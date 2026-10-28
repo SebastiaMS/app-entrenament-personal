@@ -263,7 +263,7 @@ async function showToday() {
       ${tomorrowNote}
       <div style="display:flex;flex-direction:column;gap:2px">
         <span style="font-size:28px;font-weight:800;line-height:1.1">${PROGRAM[day].name}</span>
-        <span class="muted small">${items.length} ejercicios · unos 75 min${session ? ' · ' + done + ' series hechas' : ''}</span>
+        <span class="muted small">${items.length} ejercicios · unos ${Math.round(items.length * 10.5 / 5) * 5} min${session ? ' · ' + done + ' series hechas' : ''}</span>
       </div>
       <div class="list" style="gap:0">
         ${(showAllEx ? items : items.slice(0, 3)).map((e) => `<div class="item" style="min-height:44px;font-size:15px"><span>${esc(e.name)}</span><span>${session ? e.sets : lightSets(e, light)} × ${e.reps[0]}-${e.reps[1]}</span></div>`).join('')}

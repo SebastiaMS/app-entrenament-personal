@@ -34,6 +34,8 @@ export const EXERCISES = {
     cues: ['Pies bien sujetos y manos cruzadas sobre el pecho.', 'Sube enrollando el tronco, no tirando del cuello.', 'Baja controlado sin dejarte caer.', 'Si es fácil, añade un disco sobre el pecho.'] },
   'encogimiento-polea': { video: 'https://www.youtube.com/watch?v=xr_9c1IpaCU', name: 'Encogimiento de abdomen en polea', muscle: 'Abdomen', equip: 'Polea alta y cuerda', carga: 'polea', sets: 3, reps: [10, 15],
     cues: ['De rodillas, con la cuerda junto a la cabeza.', 'Enrolla el tronco llevando los codos hacia las rodillas.', 'Mueve la columna, no la cadera.', 'Vuelve despacio sin perder la tensión.'] },
+  'elevacion-piernas-banco': { video: 'https://www.youtube.com/watch?v=-TFVKtx9tg4', name: 'Elevación de piernas tumbado en banco', muscle: 'Abdomen (parte baja)', equip: 'Banco', carga: 'peso-corporal', sets: 3, reps: [10, 15],
+    cues: ['Tumbado en el banco con las manos agarrando el borde de atrás o a los lados.', 'Lumbar pegada al banco durante todo el movimiento.', 'Sube las piernas juntas hasta que las caderas se despeguen un poco.', 'Baja despacio sin dejar caer las piernas ni arquear la espalda.', 'Si es muy difícil, dobla las rodillas.'] },
 
   // ---------- PULL ----------
   'jalon-pecho': { video: 'https://www.youtube.com/watch?v=3eYSv1nsiIU', name: 'Jalón al pecho', muscle: 'Espalda (dorsal)', equip: 'Polea de jalón', carga: 'polea', sets: 3, reps: [8, 12],
@@ -64,6 +66,8 @@ export const EXERCISES = {
     cues: ['De pie, con la barra por detrás del cuerpo, agarre con las palmas hacia atrás.', 'Deja que la barra baje hasta los dedos y sube enrollando solo las muñecas.', 'Brazos quietos y pegados al cuerpo.', 'Peso ligero y repeticiones controladas; si notas dolor en la muñeca, para.'] },
   'curl-inverso': { video: 'https://www.youtube.com/watch?v=10AFVfSUzsU', name: 'Curl inverso', muscle: 'Antebrazo y braquial', equip: 'Barra Z o mancuernas', carga: 'barra', sets: 3, reps: [10, 15],
     cues: ['Agarre con las palmas hacia abajo, a la anchura de los hombros.', 'Sube sin mover los codos de los costados.', 'Mantén las muñecas rectas.', 'Baja despacio; el peso será menor que en un curl normal.'] },
+  'curl-martillo-cuerda': { video: 'https://www.youtube.com/watch?v=HkpD34ADBw0', name: 'Curl martillo con cuerda en polea', muscle: 'Antebrazo y braquial', equip: 'Polea baja y cuerda', carga: 'polea', sets: 3, reps: [10, 15],
+    cues: ['Polea baja con cuerda y agarre neutro (palmas mirándose).', 'Mantén las muñecas rectas durante todo el recorrido.', 'Sube sin mover los codos de los costados.', 'Baja despacio manteniendo la tensión en el antebrazo.'] },
 
   // ---------- LEGS ----------
   'prensa-45': { video: 'https://www.youtube.com/watch?v=681MG5l5SrA', name: 'Prensa de pierna 45°', muscle: 'Cuádriceps y glúteo', equip: 'Prensa inclinada', carga: 'discos', sets: 3, reps: [8, 12],
@@ -94,7 +98,8 @@ export const PROGRAM = {
     ['press-hombro-mancuernas', 'press-hombro-smith'],
     ['elevaciones-laterales-mancuernas', 'elevaciones-laterales-polea'],
     ['extension-triceps-polea', 'press-frances-barra-z'],
-    ['abdominales-declinado', 'encogimiento-polea']
+    ['abdominales-declinado', 'encogimiento-polea'],
+    ['curl-martillo-cuerda', 'curl-muneca-espalda']
   ] },
   pull: { name: 'Pull', slots: [
     ['jalon-pecho', 'jalon-convergente'],
@@ -103,7 +108,7 @@ export const PROGRAM = {
     ['pajaros-mancuernas', 'face-pull'],
     ['curl-barra-z-scott', 'curl-alterno-mancuernas'],
     ['curl-martillo', 'curl-polea'],
-    ['curl-muneca-espalda', 'curl-inverso']
+    ['curl-muneca-espalda', 'curl-martillo-cuerda']
   ] },
   legs: { name: 'Legs', slots: [
     ['prensa-45', 'prensa-45'],
@@ -112,7 +117,8 @@ export const PROGRAM = {
     ['extension-cuadriceps', 'extension-cuadriceps'],
     ['hip-thrust-maquina', 'hip-thrust-maquina'],
     ['peso-muerto-rumano-mancuernas', 'zancadas-mancuernas'],
-    ['gemelos-sentado', 'gemelos-sentado']
+    ['gemelos-sentado', 'gemelos-sentado'],
+    ['elevacion-piernas-banco', 'abdominales-declinado']
   ] }
 };
 
