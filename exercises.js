@@ -93,22 +93,22 @@ export const EXERCISES = {
 };
 
 // ---------- Programa ----------
-// Cada día tiene 7 huecos. Cada hueco tiene la opción de la semana A y la de la semana B.
+// Cada día tiene sus huecos. Los ejercicios grandes (compuestos) son fijos; los de aislamiento rotan entre la opción A y la B cada 4 semanas.
 export const PROGRAM = {
   push: { name: 'Push', slots: [
-    ['press-inclinado-mancuernas', 'press-plano-smith'],
-    ['press-pecho-maquina', 'press-plano-mancuernas'],
+    ['press-inclinado-mancuernas', 'press-inclinado-mancuernas'],
+    ['press-pecho-maquina', 'press-pecho-maquina'],
     ['pec-deck', 'cruces-polea'],
-    ['press-hombro-mancuernas', 'press-hombro-smith'],
+    ['press-hombro-mancuernas', 'press-hombro-mancuernas'],
     ['elevaciones-laterales-mancuernas', 'elevaciones-laterales-polea'],
     ['extension-triceps-polea', 'press-frances-barra-z'],
     ['abdominales-declinado', 'encogimiento-polea'],
     ['curl-martillo-cuerda', 'curl-muneca-espalda']
   ] },
   pull: { name: 'Pull', slots: [
-    ['jalon-pecho', 'jalon-convergente'],
-    ['remo-sentado-polea', 'remo-maquina'],
-    ['remo-mancuerna-banco', 'remo-t-apoyo-pecho'],
+    ['jalon-pecho', 'jalon-pecho'],
+    ['remo-sentado-polea', 'remo-sentado-polea'],
+    ['remo-mancuerna-banco', 'remo-mancuerna-banco'],
     ['pajaros-mancuernas', 'face-pull'],
     ['curl-barra-z-scott', 'curl-alterno-mancuernas'],
     ['curl-martillo', 'curl-polea'],
@@ -143,11 +143,11 @@ export function nextMonday(date) {
   return d;
 }
 
-// Semana A o B según las semanas transcurridas desde el inicio del programa.
+// Bloque A o B: cambia cada 4 semanas desde el inicio del programa (solo afecta a los ejercicios de aislamiento).
 export function weekVariant(date, startDate) {
   const weeks = Math.round((mondayOf(date) - mondayOf(startDate)) / (7 * DAY_MS));
   if (weeks < 0) return 'A'; // antes de empezar el programa se muestra la semana A
-  return weeks % 2 === 0 ? 'A' : 'B';
+  return Math.floor(weeks / 4) % 2 === 0 ? 'A' : 'B';
 }
 
 // Lista de ejercicios de un día (push/pull/legs) para la semana A o B.

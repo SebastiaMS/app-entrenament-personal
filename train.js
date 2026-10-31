@@ -258,7 +258,7 @@ async function showToday() {
     ${gate ? '' : `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
         <span class="eyebrow">${session ? 'Sesión en curso' : light ? 'Te toca · versión ligera' : 'Te toca'}</span>
-        <span class="muted small">Semana ${session ? session.variant : variant}</span>
+        <span class="muted small">Bloque ${session ? session.variant : variant}</span>
       </div>
       ${tomorrowNote}
       <div style="display:flex;flex-direction:column;gap:2px">
@@ -743,7 +743,7 @@ function showDone() {
   hooks.immersive && hooks.immersive(false);
   if (!summary) { view = 'today'; return showToday(); }
   host.innerHTML = `
-    <div class="head"><span class="eyebrow">${PROGRAM[summary.day].name} · semana ${summary.variant}</span><h1>Sesión terminada</h1></div>
+    <div class="head"><span class="eyebrow">${PROGRAM[summary.day].name} · bloque ${summary.variant}</span><h1>Sesión terminada</h1></div>
     <div class="status"><div class="dot">${svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 18, 3, 'stroke="#fff"')}</div>
       <div><strong>Buen trabajo</strong><span>Tus series ya están guardadas en el historial.</span></div></div>
     <div class="card list">

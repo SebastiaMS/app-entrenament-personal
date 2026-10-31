@@ -62,9 +62,9 @@ async function renderLibrary() {
       ${Object.entries(PROGRAM).map(([id, d]) => chip(id === lib.day, `data-day="${id}"`, d.name)).join('')}
     </div>
     <div class="chips" role="group" aria-label="Semana">
-      ${['A', 'B'].map((v) => chip(v === lib.variant, `data-variant="${v}"`, 'Semana ' + v)).join('')}
+      ${['A', 'B'].map((v) => chip(v === lib.variant, `data-variant="${v}"`, 'Bloque ' + v)).join('')}
     </div>
-    <span class="muted small">Esta semana te toca la semana ${thisWeek}.</span>
+    <span class="muted small">Ahora te toca el bloque ${thisWeek}. Los ejercicios grandes no cambian; los de aislamiento rotan cada 4 semanas.</span>
     <div class="exlist">
       ${items.map((ex, i) => {
         const alt = otherOption(lib.day, ex.id);
@@ -74,7 +74,7 @@ async function renderLibrary() {
             ${ex.tecnica ? '<span class="tag">Aprende primero la técnica con poco peso</span>' : ''}
             <ul>${ex.cues.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>
             <div class="muted small">${esc(ex.equip)}${ex.carga === 'mancuerna' ? ' · saltos de 2,5 kg' : ''}</div>
-            ${alt ? `<div class="muted small">La otra semana: ${esc(EXERCISES[alt].name)}</div>` : ''}
+            ${alt ? `<div class="muted small">En el otro bloque: ${esc(EXERCISES[alt].name)}</div>` : ''}
             <a class="btn link" href="${videoUrl(ex.id)}" target="_blank" rel="noopener">${svg('<path d="M8 5.5v13l11-6.5z"/>', 16, 2)}Ver vídeo de la técnica</a>
           </div>
         </details>`;
