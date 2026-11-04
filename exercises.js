@@ -50,6 +50,8 @@ export const EXERCISES = {
     cues: ['Rodilla y mano del mismo lado apoyadas en el banco, espalda plana.', 'Tira de la mancuerna hacia la cadera, no hacia el hombro.', 'No gires el tronco para subir el peso.', 'Baja hasta estirar el brazo sin soltar la tensión.'] },
   'remo-t-apoyo-pecho': { video: 'https://www.youtube.com/watch?v=UXi3cO3ooDc', name: 'Remo T con apoyo de pecho', muscle: 'Espalda', equip: 'Máquina de remo T', carga: 'discos', sets: 3, reps: [8, 12],
     cues: ['Pecho bien apoyado en el pad, sin levantarlo al tirar.', 'Tira de las asas hacia el abdomen llevando los codos atrás.', 'Junta las escápulas sin encoger los hombros.', 'Baja despacio hasta estirar los brazos.'] },
+  'pullover-polea': { video: 'https://www.youtube.com/watch?v=h7GdgB6NV54', name: 'Pullover con cuerda en polea alta', muscle: 'Espalda (dorsal)', equip: 'Polea alta y cuerda', carga: 'polea', sets: 3, reps: [10, 15],
+    cues: ['De pie frente a la polea alta, ligera inclinación del torso y brazos casi estirados.', 'Baja la cuerda en arco hasta los muslos, llevando los brazos hacia atrás.', 'Mueve los hombros, no los codos: los brazos casi rectos todo el recorrido.', 'Sube despacio hasta sentir el estiramiento del dorsal; sin balancear el cuerpo.'] },
   'pajaros-mancuernas': { video: 'https://www.youtube.com/watch?v=-NtDTvtncy0', name: 'Pájaros con mancuernas', muscle: 'Hombro posterior', equip: 'Banco y mancuernas', carga: 'mancuerna', sets: 3, reps: [12, 20],
     cues: ['Sentado en el borde del banco, torso inclinado hacia delante y pecho cerca de los muslos.', 'Peso ligero: es un músculo pequeño.', 'Abre los brazos hacia los lados con los codos casi estirados, hasta la altura del torso.', 'Piensa en llevar las manos hacia fuera, no en juntar las escápulas con fuerza.', 'Vuelve despacio sin perder tensión y sin balancear el cuerpo.'] },
   'face-pull': { video: 'https://www.youtube.com/watch?v=BwFDZGcM0Hc', name: 'Face pull en polea', muscle: 'Hombro posterior y espalda alta', equip: 'Polea alta y cuerda', carga: 'polea', sets: 3, reps: [12, 20],
@@ -108,7 +110,7 @@ export const PROGRAM = {
   pull: { name: 'Pull', slots: [
     ['jalon-pecho', 'jalon-pecho'],
     ['remo-sentado-polea', 'remo-sentado-polea'],
-    ['remo-t-apoyo-pecho', 'remo-t-apoyo-pecho'],
+    ['pullover-polea', 'remo-t-apoyo-pecho'],
     ['pajaros-mancuernas', 'face-pull'],
     ['curl-barra-z-scott', 'curl-alterno-mancuernas'],
     ['curl-martillo', 'curl-polea'],
