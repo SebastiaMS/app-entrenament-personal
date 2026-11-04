@@ -108,7 +108,7 @@ export const PROGRAM = {
   pull: { name: 'Pull', slots: [
     ['jalon-pecho', 'jalon-pecho'],
     ['remo-sentado-polea', 'remo-sentado-polea'],
-    ['remo-mancuerna-banco', 'remo-mancuerna-banco'],
+    ['remo-t-apoyo-pecho', 'remo-t-apoyo-pecho'],
     ['pajaros-mancuernas', 'face-pull'],
     ['curl-barra-z-scott', 'curl-alterno-mancuernas'],
     ['curl-martillo', 'curl-polea'],
