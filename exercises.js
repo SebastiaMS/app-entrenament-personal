@@ -104,7 +104,7 @@ export const PROGRAM = {
     ['press-hombro-mancuernas', 'press-hombro-mancuernas'],
     ['elevaciones-laterales-mancuernas', 'elevaciones-laterales-polea'],
     ['extension-triceps-polea', 'press-frances-barra-z'],
-    ['abdominales-declinado', 'encogimiento-polea'],
+    ['abdominales-declinado', 'elevacion-piernas-banco'],
     ['curl-martillo-cuerda', 'curl-muneca-espalda']
   ] },
   pull: { name: 'Pull', slots: [
