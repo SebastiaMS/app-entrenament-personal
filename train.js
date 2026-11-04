@@ -4,6 +4,7 @@ import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } fro
 import { beep, esc, flashCard, fmtClock, keepAwake, localDate, fmtTotal, releaseAwake, svg, toast, unlockAudio } from './util.js';
 import { suggestion } from './progress.js';
 import { bodyKg, startingWeight } from './starting.js';
+import { backupDue, exportNow, snoozeBackup } from './backup.js';
 import { ZONES, affected, getMolestia, setMolestia } from './molestia.js';
 import { LOW_SLEEP_MIN, preloadGis, syncSleep } from './fitbit.js';
 import { KINDS, getMark, openDaySheet, weekData, weekStripHtml, weekTip } from './week.js';
@@ -249,6 +250,11 @@ async function showToday() {
         <button class="btn" data-deload="snooze" style="flex:none;min-height:44px">Ahora no (preguntar en una semana)</button></div>`;
     }
   }
+  const bk = session ? null : await backupDue();
+  const backupCard = bk ? `<div class="card" id="backup-card"><span class="eyebrow">Copia de seguridad</span>
+      <p>${bk.never ? 'Aún no has hecho ninguna copia de tu historial.' : `Hace ${bk.days} días de tu última copia.`} Todo está solo en este móvil: si se borran los datos de Safari o cambias de teléfono, lo perderías.</p>
+      <button class="btn primary" id="backup-now" style="flex:none;min-height:48px">Guardar copia ahora</button>
+      <button class="btn" id="backup-later" style="flex:none;min-height:44px">Recordármelo en 3 días</button></div>` : '';
   const zonesTxt = mol ? mol.zones.map((z) => ZONES[z].toLowerCase()).join(', ') : '';
   const molCard = session ? '' : mol
     ? `<div class="card" id="mol-card"><span class="eyebrow">Modo molestia activo</span>
@@ -267,6 +273,7 @@ async function showToday() {
     ${sleepCard}
     ${deloadCard}
     ${molCard}
+    ${backupCard}
     ${gate}
     ${gate ? '' : `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
@@ -307,6 +314,12 @@ async function showToday() {
     if (b.dataset.mol === 'off') { await setMolestia([]); showToday(); }
     else pickZoneDialog(async (zones) => { await setMolestia(zones); showToday(); });
   }));
+  const bnow = document.getElementById('backup-now');
+  if (bnow) bnow.addEventListener('click', async () => {
+    try { if (await exportNow()) { toast('Copia guardada'); showToday(); } } catch (e) { toast('No se pudo crear la copia: ' + e.message); }
+  });
+  const blater = document.getElementById('backup-later');
+  if (blater) blater.addEventListener('click', async () => { await snoozeBackup(3); showToday(); });
   const sync = document.getElementById('sleep-sync');
   if (sync) {
     preloadGis();

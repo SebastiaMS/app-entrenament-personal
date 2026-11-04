@@ -5,6 +5,7 @@ import { renderHistory } from './history.js';
 import { renderWeek } from './week.js';
 import { renderNutrition } from './nutrition.js';
 import { openVideo } from './util.js';
+import { exportNow } from './backup.js';
 
 const ICONS = {
   hoy: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>',
@@ -168,19 +169,8 @@ function say(text, kind) {
 
 async function doExport() {
   try {
-    const backup = await exportBackup();
-    const name = 'copia-entrenador-' + new Date().toISOString().slice(0, 10) + '.json';
-    const file = new File([JSON.stringify(backup, null, 2)], name, { type: 'application/json' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      // En iPhone abre la hoja de compartir: "Guardar en Archivos", AirDrop, etc.
-      try { await navigator.share({ files: [file], title: name }); } catch (e) { if (e.name === 'AbortError') return; throw e; }
-    } else {
-      const url = URL.createObjectURL(file);
-      const a = document.createElement('a');
-      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    }
-    await setSetting('lastBackup', new Date().toISOString());
+    const name = await exportNow();
+    if (!name) return;
     say('Copia creada: ' + name, 'ok');
     renderSettings(TABS[4]).then(() => say('Copia creada: ' + name, 'ok'));
   } catch (e) {
