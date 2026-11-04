@@ -339,3 +339,10 @@ dialog.videodlg { width: min(560px, calc(100vw - 24px)); padding: 12px; }
 html, body, button, a, input, label, summary, .card { touch-action: manipulation; }
 button, summary, a, label { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 button *, .btn *, .mini *, .hecha *, .next-btn *, .back-btn * { pointer-events: none; }
+
+/* Pantalla Entrenar: todos los botones secundarios con el mismo alto, ancho de columna y separación */
+.btngrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btngrid .mini, .btngrid a.mini { width: 100%; min-height: 48px; padding: 0 12px; flex: none; justify-content: center; }
+#skip { min-height: 48px; }
+.btngrid .mini { white-space: nowrap; font-size: 14px; gap: 6px; padding: 0 8px; line-height: 1; }
+.btngrid .mini svg { flex: none; }
