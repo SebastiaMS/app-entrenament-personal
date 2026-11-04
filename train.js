@@ -4,6 +4,7 @@ import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } fro
 import { beep, esc, flashCard, fmtClock, keepAwake, localDate, fmtTotal, releaseAwake, svg, toast, unlockAudio } from './util.js';
 import { suggestion } from './progress.js';
 import { bodyKg, startingWeight } from './starting.js';
+import { ZONES, affected, getMolestia, setMolestia } from './molestia.js';
 import { LOW_SLEEP_MIN, preloadGis, syncSleep } from './fitbit.js';
 import { KINDS, getMark, openDaySheet, weekData, weekStripHtml, weekTip } from './week.js';
 import { ROUTINES, doneToday, favorites, routineMinutes, startMobility, suggestedRoutine, toggleFavorite } from './mobility.js';
@@ -140,7 +141,10 @@ async function showToday() {
   const variant = await programVariant();
   const suggested = await nextDay();
   const day = session ? session.day : pickedDay || suggested;
-  const items = session ? session.ids.map((id) => ({ id, ...EXERCISES[id] })) : sessionFor(day, variant);
+  const mol = await getMolestia();
+  let items = session ? session.ids.map((id) => ({ id, ...EXERCISES[id] })) : sessionFor(day, variant);
+  let quitados = 0;
+  if (!session && mol) { const ok = items.filter((e) => !affected(e.id, mol.zones)); if (ok.length) { quitados = items.length - ok.length; items = ok; } }
   const sessions = await getAll('sessions');
   const lastSession = sessions.sort((a, b) => b.id - a.id)[0];
   const w = await weekData();
@@ -245,6 +249,14 @@ async function showToday() {
         <button class="btn" data-deload="snooze" style="flex:none;min-height:44px">Ahora no (preguntar en una semana)</button></div>`;
     }
   }
+  const zonesTxt = mol ? mol.zones.map((z) => ZONES[z].toLowerCase()).join(', ') : '';
+  const molCard = session ? '' : mol
+    ? `<div class="card" id="mol-card"><span class="eyebrow">Modo molestia activo</span>
+        <p>Zona: ${esc(zonesTxt)}. ${quitados ? `Hoy se quitan ${quitados} ejercicio${quitados === 1 ? '' : 's'} que la cargan.` : 'Hoy no hay ejercicios que la carguen.'}</p>
+        <button class="btn" data-mol="off" style="flex:none;min-height:44px">Ya estoy bien: desactivar</button></div>`
+    : `<div class="card" id="mol-card"><span class="eyebrow">¿Alguna molestia?</span>
+        <p>Si algo te duele, marca la zona y la app quita los ejercicios que la cargan.</p>
+        <button class="btn" data-mol="set" style="flex:none;min-height:44px">Tengo una molestia</button></div>`;
   const tomorrowNote = !session && !gate && day === 'legs' && tomorrowKind === 'padel'
     ? '<span class="tag" style="background:var(--tint)">Mañana tienes pádel: mejor deja Legs para otro día</span>' : '';
 
@@ -254,6 +266,7 @@ async function showToday() {
     ${mobCard}
     ${sleepCard}
     ${deloadCard}
+    ${molCard}
     ${gate}
     ${gate ? '' : `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
@@ -289,6 +302,10 @@ async function showToday() {
     else if (a === 'off') { await setSetting('deload', null); await setSetting('lastDeload', localDate()); }
     else await setSetting('deloadSnooze', addDays(localDate(), 7));
     showToday();
+  }));
+  host.querySelectorAll('[data-mol]').forEach((b) => b.addEventListener('click', async () => {
+    if (b.dataset.mol === 'off') { await setMolestia([]); showToday(); }
+    else pickZoneDialog(async (zones) => { await setMolestia(zones); showToday(); });
   }));
   const sync = document.getElementById('sleep-sync');
   if (sync) {
@@ -342,7 +359,9 @@ async function startSession(day, light = false) {
   const dl = await deloadInfo();
   if (dl.active) light = true;
   const variant = await programVariant();
-  const items = sessionFor(day, variant);
+  const mol = await getMolestia();
+  let items = sessionFor(day, variant);
+  if (mol) { const ok = items.filter((e) => !affected(e.id, mol.zones)); if (ok.length) items = ok; }
   const sets = {};
   const targets = {};
   session = { id: Date.now(), day, variant, light, deload: dl.active, targets, startedAt: new Date().toISOString(), idx: 0, ids: items.map((e) => e.id), sets, restEnd: null, restTotal: 0 };
@@ -458,6 +477,51 @@ async function removeExercise() {
   showTrain();
 }
 
+// Elige zonas con molestia (una o varias) y llama a onDone(zonas).
+function pickZoneDialog(onDone, current = []) {
+  const dlg = document.createElement('dialog');
+  dlg.innerHTML = `<h2>¿Dónde notas la molestia?</h2><p>Puedes marcar varias. La app quita los ejercicios que cargan esa zona hasta que la desactives.</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${Object.entries(ZONES).map(([k, v]) => `<button class="btn" data-zone="${k}" aria-pressed="${current.includes(k)}" style="flex:none;min-height:48px;justify-content:flex-start">${esc(v)}</button>`).join('')}
+      <button class="btn primary" id="zone-ok" style="flex:none;min-height:52px">Aplicar</button>
+      <button class="btn" id="zone-cancel" style="flex:none;min-height:44px">Cancelar</button>
+    </div>
+    <p class="muted small">Si el dolor es fuerte, persiste o no sabes qué es, consúltalo con un fisio o un médico.</p>`;
+  document.body.appendChild(dlg);
+  const close = () => { dlg.close(); dlg.remove(); };
+  dlg.addEventListener('cancel', () => dlg.remove());
+  dlg.querySelector('#zone-cancel').addEventListener('click', close);
+  dlg.querySelectorAll('[data-zone]').forEach((b) => b.addEventListener('click', () => b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'))));
+  dlg.querySelector('#zone-ok').addEventListener('click', async () => {
+    const zones = [...dlg.querySelectorAll('[data-zone][aria-pressed="true"]')].map((b) => b.dataset.zone);
+    close();
+    if (zones.length) await onDone(zones);
+  });
+  dlg.showModal();
+}
+
+// Molestia durante la sesión: quita los ejercicios pendientes que cargan esa zona.
+async function sessionPain() {
+  pickZoneDialog(async (zones) => {
+    await setMolestia(zones);
+    const pend = session.ids.filter((id, i) => affected(id, zones) && !session.sets[id].some((s) => s.done) && i !== session.idx);
+    const cur = session.ids[session.idx];
+    const curHit = affected(cur, zones) && !session.sets[cur].some((s) => s.done);
+    const drop = [...pend, ...(curHit ? [cur] : [])];
+    if (drop.length >= session.ids.length) drop.pop(); // la sesión necesita al menos un ejercicio
+    for (const id of drop) {
+      await dropLogs(id);
+      session.ids.splice(session.ids.indexOf(id), 1);
+      delete session.sets[id];
+      if (session.targets) delete session.targets[id];
+    }
+    session.idx = Math.min(session.idx, session.ids.length - 1);
+    await persist();
+    toast(drop.length ? `Quitados ${drop.length} ejercicio${drop.length === 1 ? '' : 's'} que cargan esa zona` : 'Anotada la molestia: no quedan ejercicios que la carguen');
+    showTrain();
+  });
+}
+
 let returnTo = null; // al terminar una edición desde el Historial, vuelve allí
 export async function editSession(container, h, rec, back) {
   host = container;
@@ -552,6 +616,7 @@ async function showTrain() {
         <button class="mini" id="add-set" style="flex:none">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.5)}Añadir serie</button>
         <button class="mini" id="add-ex" style="flex:none">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.5)}Añadir ejercicio</button>
         <button class="mini" id="swap-ex" style="flex:none">${svg('<path d="M7 7h11l-3-3M17 17H6l3 3"/>', 16, 2.2)}Cambiar ejercicio</button>
+        <button class="mini" id="pain-ex" style="flex:none">${svg('<path d="M12 8v5M12 17h.01"/><circle cx="12" cy="12" r="9"/>', 16, 2.2)}Tengo una molestia</button>
         <button class="mini" id="del-ex" style="flex:none;color:var(--coral);border-color:#E8B8B2">${svg('<path d="M6 6l12 12M18 6L6 18"/>', 16, 2.5)}Quitar ejercicio</button>
       </div>
     </div>
@@ -608,6 +673,7 @@ async function showTrain() {
   document.getElementById('add-ex').addEventListener('click', () => pickExerciseDialog());
   document.getElementById('swap-ex').addEventListener('click', askSwap);
   document.getElementById('del-ex').addEventListener('click', removeExercise);
+  document.getElementById('pain-ex').addEventListener('click', sessionPain);
   document.getElementById('skip').addEventListener('click', () => { endRest(false); });
   document.getElementById('prev').addEventListener('click', async () => {
     if (session.idx === 0) {
