@@ -75,6 +75,12 @@ export async function keepAwake() {
   } catch (e) { /* no disponible */ }
 }
 
+// iOS en una web instalada: soltar la pantalla encendida al salir y pedirla un momento después al volver
+// evita que la app se quede en negro.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { try { wakeLock && wakeLock.release(); } catch (e) { /* nada */ } wakeLock = null; }
+});
+
 export function releaseAwake() {
   try { wakeLock && wakeLock.release(); } catch (e) { /* nada */ }
   wakeLock = null;
@@ -117,3 +123,65 @@ export function fmtTotal(ms) {
   const p = (n) => String(n).padStart(2, '0');
   return h ? `${h}:${p(m)}:${p(r)}` : `${m}:${p(r)}`;
 }
+
+// ---- Aviso con la app en segundo plano ----
+// iOS congela los temporizadores de una web en segundo plano, pero deja sonar un audio. Por eso se genera
+// un audio con tantos segundos de silencio como dure el descanso y tres pitidos al final: suena solo, aunque la app esté detrás.
+// Mientras suena usa el modo 'playback' de iOS (ignora el interruptor de silencio); al terminar vuelve a 'ambient'.
+let restAudio = null;
+let restUrl = null;
+
+function restWav(seconds) {
+  const rate = 8000;
+  const n = Math.round((seconds + 0.9) * rate);
+  const data = new Uint8Array(n).fill(128);
+  [0, 0.25, 0.5].forEach((d) => {
+    const from = Math.round((seconds + d) * rate);
+    for (let i = 0; i < Math.round(0.15 * rate) && from + i < n; i++) data[from + i] = 128 + Math.round(48 * Math.sin((2 * Math.PI * 880 * i) / rate));
+  });
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  w(36, 'data'); v.setUint32(40, n, true);
+  new Uint8Array(buf, 44).set(data);
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+// Llamar dentro de un toque del usuario (iOS no deja reproducir audio si no).
+export function primeRestAudio() {
+  try {
+    restAudio = restAudio || new Audio();
+    restAudio.muted = false;
+    restAudio.playsInline = true;
+  } catch (e) { /* sin audio */ }
+}
+
+export function startRestAudio(seconds) {
+  try {
+    primeRestAudio();
+    stopRestAudio(true);
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    restUrl = URL.createObjectURL(restWav(seconds));
+    restAudio.src = restUrl;
+    restAudio.onended = () => stopRestAudio();
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: 'Descanso', artist: 'Entrenador' });
+      navigator.mediaSession.setActionHandler('pause', null);
+    }
+    const p = restAudio.play();
+    if (p && p.catch) p.catch(() => { /* iOS no lo permitió: queda el pitido normal */ });
+  } catch (e) { /* sin audio */ }
+}
+
+export function stopRestAudio(keepSession = false) {
+  try {
+    if (restAudio) { restAudio.onended = null; restAudio.pause(); restAudio.removeAttribute('src'); restAudio.load(); }
+    if (restUrl) { URL.revokeObjectURL(restUrl); restUrl = null; }
+    if (!keepSession && navigator.audioSession) navigator.audioSession.type = 'ambient';
+  } catch (e) { /* nada */ }
+}
+
+export const restAudioPlaying = () => !!(restAudio && restAudio.src && !restAudio.paused);

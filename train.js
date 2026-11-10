@@ -1,7 +1,7 @@
 // Pantallas Hoy (sesión que toca) y Entrenar (registrar series con temporizador).
 import { del, getAll, getByIndex, getSetting, put, setSetting } from './db.js';
 import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } from './exercises.js';
-import { beep, esc, flashCard, fmtClock, keepAwake, localDate, fmtTotal, releaseAwake, svg, toast, unlockAudio } from './util.js';
+import { beep, esc, flashCard, fmtClock, keepAwake, localDate, fmtTotal, primeRestAudio, startRestAudio, stopRestAudio, restAudioPlaying, releaseAwake, svg, toast, unlockAudio } from './util.js';
 import { suggestion } from './progress.js';
 import { bodyKg, startingWeight } from './starting.js';
 import { backupDue, exportNow, snoozeBackup } from './backup.js';
@@ -574,6 +574,7 @@ async function reopenSession(rec) {
 }
 
 async function discardSession() {
+  stopRestAudio();
   for (const id of session.ids) {
     const rows = await getByIndex('logs', 'exerciseId', id);
     for (const r of rows) if (r.sessionId === session.id) await del('logs', r.id);
@@ -725,6 +726,7 @@ async function writeLog(exId, i) {
 async function toggleSet(exId, i) {
   const s = session.sets[exId][i];
   if (!s.done) {
+    primeRestAudio(); // dentro del toque, para que iOS deje sonar el aviso en segundo plano
     if (s.w === '' && EXERCISES[exId].carga === 'peso-corporal') s.w = 0; // sin lastre: el peso queda en 0
     if (s.w === '' || !(s.w >= 0) || !(s.r > 0)) {
       toast(s.w !== '' && !(s.r > 0) ? 'Escribe las repeticiones.' : 'Escribe el peso y las repeticiones.');
@@ -735,7 +737,10 @@ async function toggleSet(exId, i) {
     const rest = restFor(EXERCISES[exId]);
     session.restTotal = rest;
     session.restEnd = Date.now() + rest * 1000;
-    if (await getSetting('restSound', true)) unlockAudio();
+    if (await getSetting('restSound', true)) {
+      unlockAudio();
+      if (await getSetting('restBg', true)) startRestAudio(rest);
+    }
   } else {
     s.done = false;
     await del('logs', `${session.id}-${exId}-${i}`);
@@ -788,16 +793,24 @@ async function endRest(alert) {
     toast('Descanso terminado. A por la siguiente serie.');
     flashCard(t && t.closest('.card'));
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    if (await getSetting('restSound', true)) beep();
+    if (await getSetting('restSound', true) && !restAudioPlaying()) beep();
+  } else {
+    stopRestAudio();
   }
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && view === 'train' && session) { keepAwake(); tick(); }
+  if (document.visibilityState === 'visible' && view === 'train' && session) { setTimeout(() => { keepAwake(); }, 800); tick(); }
+});
+// Si iOS recupera la página de su memoria rápida con la pantalla vacía, se recarga.
+window.addEventListener('pageshow', (e) => {
+  const root = document.getElementById('app') || document.body;
+  if (e.persisted && !root.textContent.trim()) location.reload();
 });
 
 // ---------- Terminar ----------
 async function finishSession() {
+  stopRestAudio();
   const setsDone = Object.values(session.sets).flat().filter((s) => s.done).length;
   if (setsDone === 0 && !confirm('No has marcado ninguna serie como hecha. ¿Terminar la sesión igualmente?')) return;
   const finishedAt = session.finishedAt || new Date().toISOString();

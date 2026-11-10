@@ -114,6 +114,7 @@ function fmtDate(iso) {
 
 async function renderSettings(tab) {
   const restSound = await getSetting('restSound', true);
+  const restBg = await getSetting('restBg', true);
   const [lastBackup, persisted, logs, weights] = await Promise.all([
     getSetting('lastBackup'),
     navigator.storage && navigator.storage.persisted ? navigator.storage.persisted() : null,
@@ -143,6 +144,11 @@ async function renderSettings(tab) {
       <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>', 18, 2.5)}Sonido al acabar el descanso</span>
       <span style="color:${restSound ? 'var(--green)' : 'var(--muted)'};font-weight:800">${restSound ? 'Sí' : 'No'}</span>
     </button>
+    <button class="btn" id="toggle-bg" role="switch" aria-checked="${restBg}" style="flex:none;justify-content:space-between;padding:0 16px">
+      <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>', 18, 2.5)}Sonar con la app en segundo plano</span>
+      <span style="color:${restBg ? 'var(--green)' : 'var(--muted)'};font-weight:800">${restBg ? 'Sí' : 'No'}</span>
+    </button>
+    <p class="muted small" style="margin:-4px 4px 0">Al activarlo, el aviso suena aunque salgas de la app y aunque el móvil esté en silencio. Si no quieres eso, desactívalo.</p>
     <button class="btn" id="open-lib" style="flex:none;justify-content:space-between;padding:0 16px">
       <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M4 6h16M4 12h16M4 18h10"/>', 18, 2.5)}Ejercicios de Push, Pull y Legs</span>${svg('<path d="M9 5l7 7-7 7"/>', 18, 2.5)}
     </button>
@@ -155,6 +161,10 @@ async function renderSettings(tab) {
   if (window.caches) caches.keys().then((ks) => { const k = ks.find((x) => x.startsWith('entrenador-')); const el = document.getElementById('app-ver'); if (el && k) el.textContent = '1.0 · ' + k.replace('entrenador-', ''); }).catch(() => {});
   document.getElementById('toggle-sound').addEventListener('click', async () => {
     await setSetting('restSound', !restSound);
+    renderSettings(tab);
+  });
+  document.getElementById('toggle-bg').addEventListener('click', async () => {
+    await setSetting('restBg', !restBg);
     renderSettings(tab);
   });
   document.getElementById('open-lib').addEventListener('click', () => { libraryOpen = true; renderLibrary(); });
