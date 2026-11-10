@@ -127,7 +127,7 @@ export function fmtTotal(ms) {
 // ---- Aviso con la app en segundo plano ----
 // iOS congela los temporizadores de una web en segundo plano, pero deja sonar un audio. Por eso se genera
 // un audio con tantos segundos de silencio como dure el descanso y tres pitidos al final: suena solo, aunque la app esté detrás.
-// Mientras suena usa el modo 'playback' de iOS (ignora el interruptor de silencio); al terminar vuelve a 'ambient'.
+// Mientras suena usa el modo 'transient' de iOS (pensado para avisos cortos y para no pausar la música); al terminar vuelve a 'ambient'.
 let restAudio = null;
 let restUrl = null;
 
@@ -163,7 +163,7 @@ export function startRestAudio(seconds) {
   try {
     primeRestAudio();
     stopRestAudio(true);
-    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    if (navigator.audioSession) navigator.audioSession.type = 'transient'; // sonidos cortos: debe convivir con la música en vez de pausarla
     restUrl = URL.createObjectURL(restWav(seconds));
     restAudio.src = restUrl;
     restAudio.onended = () => stopRestAudio();
