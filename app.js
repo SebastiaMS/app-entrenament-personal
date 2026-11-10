@@ -115,6 +115,7 @@ function fmtDate(iso) {
 async function renderSettings(tab) {
   const restSound = await getSetting('restSound', true);
   const restBg = await getSetting('restBg', true);
+  const bgMode = await getSetting('restBgMode', 'solo');
   const [lastBackup, persisted, logs, weights] = await Promise.all([
     getSetting('lastBackup'),
     navigator.storage && navigator.storage.persisted ? navigator.storage.persisted() : null,
@@ -148,7 +149,9 @@ async function renderSettings(tab) {
       <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>', 18, 2.5)}Sonar con la app en segundo plano</span>
       <span style="color:${restBg ? 'var(--green)' : 'var(--muted)'};font-weight:800">${restBg ? 'Sí' : 'No'}</span>
     </button>
-    <p class="muted small" style="margin:-4px 4px 0">Al activarlo, el aviso suena aunque salgas de la app y aunque el móvil esté en silencio. Si no quieres eso, desactívalo.</p>
+    ${restBg ? `<button class="btn" id="toggle-bgmode" style="flex:none;justify-content:space-between;padding:0 16px">
+      <span>Modo del aviso</span><span style="color:var(--green);font-weight:800">${bgMode === 'mix' ? 'Con música' : 'Máxima fiabilidad'}</span></button>` : ''}
+    <p class="muted small" style="margin:-4px 4px 0">${restBg ? (bgMode === 'mix' ? 'Con música: intenta no pausar Spotify, pero puede que no suene con la app en segundo plano.' : 'Máxima fiabilidad: suena en segundo plano, pero pausa la música durante el descanso.') + ' ' : ''}Al activarlo, el aviso suena aunque salgas de la app y aunque el móvil esté en silencio. Si no quieres eso, desactívalo.</p>
     <button class="btn" id="open-lib" style="flex:none;justify-content:space-between;padding:0 16px">
       <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M4 6h16M4 12h16M4 18h10"/>', 18, 2.5)}Ejercicios de Push, Pull y Legs</span>${svg('<path d="M9 5l7 7-7 7"/>', 18, 2.5)}
     </button>
@@ -167,6 +170,8 @@ async function renderSettings(tab) {
     await setSetting('restBg', !restBg);
     renderSettings(tab);
   });
+  const bm = document.getElementById('toggle-bgmode');
+  if (bm) bm.addEventListener('click', async () => { await setSetting('restBgMode', bgMode === 'mix' ? 'solo' : 'mix'); renderSettings(tab); });
   document.getElementById('open-lib').addEventListener('click', () => { libraryOpen = true; renderLibrary(); });
   document.getElementById('export').addEventListener('click', doExport);
   document.getElementById('import').addEventListener('change', doImport);

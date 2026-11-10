@@ -159,11 +159,11 @@ export function primeRestAudio() {
   } catch (e) { /* sin audio */ }
 }
 
-export function startRestAudio(seconds) {
+export function startRestAudio(seconds, mode = 'solo') {
   try {
     primeRestAudio();
     stopRestAudio(true);
-    if (navigator.audioSession) navigator.audioSession.type = 'transient'; // sonidos cortos: debe convivir con la música en vez de pausarla
+    if (navigator.audioSession) navigator.audioSession.type = mode === 'mix' ? 'transient' : 'playback'; // 'mix': convive con la música; 'solo': máxima fiabilidad en segundo plano (pausa la música)
     restUrl = URL.createObjectURL(restWav(seconds));
     restAudio.src = restUrl;
     restAudio.onended = () => stopRestAudio();

@@ -739,7 +739,7 @@ async function toggleSet(exId, i) {
     session.restEnd = Date.now() + rest * 1000;
     if (await getSetting('restSound', true)) {
       unlockAudio();
-      if (await getSetting('restBg', true)) startRestAudio(rest);
+      if (await getSetting('restBg', true)) startRestAudio(rest, await getSetting('restBgMode', 'solo'));
     }
   } else {
     s.done = false;
