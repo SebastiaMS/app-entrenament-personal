@@ -114,7 +114,7 @@ function fmtDate(iso) {
 
 async function renderSettings(tab) {
   const restSound = await getSetting('restSound', true);
-  const restBg = await getSetting('restBg', true);
+  const restBg = await getSetting('restBg', false);
   const bgMode = await getSetting('restBgMode', 'solo');
   const [lastBackup, persisted, logs, weights] = await Promise.all([
     getSetting('lastBackup'),
@@ -146,7 +146,7 @@ async function renderSettings(tab) {
       <span style="color:${restSound ? 'var(--green)' : 'var(--muted)'};font-weight:800">${restSound ? 'Sí' : 'No'}</span>
     </button>
     <button class="btn" id="toggle-bg" role="switch" aria-checked="${restBg}" style="flex:none;justify-content:space-between;padding:0 16px">
-      <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>', 18, 2.5)}Sonar con la app en segundo plano</span>
+      <span style="display:flex;align-items:center;gap:8px">${svg('<path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>', 18, 2.5)}Sonar en segundo plano (experimental)</span>
       <span style="color:${restBg ? 'var(--green)' : 'var(--muted)'};font-weight:800">${restBg ? 'Sí' : 'No'}</span>
     </button>
     ${restBg ? `<button class="btn" id="toggle-bgmode" style="flex:none;justify-content:space-between;padding:0 16px">
