@@ -346,3 +346,7 @@ button *, .btn *, .mini *, .hecha *, .next-btn *, .back-btn * { pointer-events: 
 #skip { min-height: 48px; }
 .btngrid .mini { white-space: nowrap; font-size: 14px; gap: 6px; padding: 0 8px; line-height: 1; }
 .btngrid .mini svg { flex: none; }
+
+/* Sugerencia de carga estructurada */
+.tlines { margin: 6px 0 0; padding-left: 18px; font-weight: 500; font-size: 14px; line-height: 1.4; }
+.tlines li { margin: 2px 0; }

@@ -4,10 +4,8 @@
 // Si no, mantienes el peso e intentas una repetición más.
 import { getByIndex } from './db.js';
 
-// Escalón de subida (kg) según el tipo de carga. Si tu máquina no tiene un paso tan pequeño, usa el siguiente disponible.
-const STEP = { mancuerna: 2.5, polea: 2.5, smith: 2.5, barra: 2.5, maquina: 5, discos: 5 };
-
-export const fmt = (n) => String(n).replace('.', ',');
+import { fmt, nextAbove, prevBelow, rig } from './loads.js';
+export { fmt };
 
 // Últimas sesiones de un ejercicio, de más reciente a más antigua: [[filas de la sesión]]
 async function recentSessions(exId, excludeId, n = 2) {
@@ -21,33 +19,52 @@ async function recentSessions(exId, excludeId, n = 2) {
 }
 
 // Qué hacer hoy con este ejercicio. Devuelve null si es la primera vez.
-// { kind: 'up'|'down'|'hold'|'reps', weight, text }
+// { kind: 'up'|'down'|'hold', weight, text (titular), lines (detalle) }
 export async function suggestion(exId, ex, excludeId = null) {
   const sessions = await recentSessions(exId, excludeId);
   if (!sessions.length) return null;
+  ex = { id: exId, ...ex };
   const [lo, hi] = ex.reps;
   const last = sessions[0];
   const top = Math.max(...last.map((r) => r.weight));
   const at = last.filter((r) => r.weight === top);
-  const need = Math.max(2, Math.min(ex.sets, 3) - 0);
+  const need = Math.max(2, Math.min(ex.sets, 3));
   const bodyweight = ex.carga === 'peso-corporal';
+  const lastTxt = last.map((r) => `${fmt(r.weight)}×${r.reps}`).join(', ');
+  const goal = `${ex.sets} series de ${lo}-${hi} reps, 3-4 en reserva`;
 
   const allTop = at.length >= Math.min(need, ex.sets) && at.every((r) => r.reps >= hi);
   if (allTop) {
-    if (bodyweight) return { kind: 'up', weight: top, text: `Llegaste a ${hi} reps en todas: añade lastre o una variante más difícil` };
-    const step = STEP[ex.carga] || 2.5;
-    return { kind: 'up', weight: top + step, text: `Subes a ${fmt(top + step)} kg: completaste ${hi} reps en todas las series` };
+    if (bodyweight) return { kind: 'up', weight: top, text: 'Hoy: más difícil', lines: [`Por qué: llegaste a ${hi} reps en todas las series.`, 'Qué hacer: añade lastre o una variante más difícil y vuelve al rango bajo.', `Objetivo: ${goal}.`] };
+    const w = nextAbove(ex, top);
+    const how = rig(ex, w);
+    return { kind: 'up', weight: w, text: `Hoy: sube a ${fmt(w)} kg`, lines: [
+      `Por qué: la última vez hiciste ${hi} reps en todas las series con ${fmt(top)} kg (${lastTxt}).`,
+      `Objetivo: ${goal}. Con más peso es normal bajar a ${lo}-${lo + 2} reps.`,
+      ...(how ? [`Cómo montarlo: ${how}.`] : []),
+      `Si no llegas a ${lo} reps en la primera serie, baja a ${fmt(top)} kg.`
+    ] };
   }
   const low = (s) => s.some((r) => r.reps < lo);
   if (sessions[1] && low(last) && low(sessions[1]) && !bodyweight) {
     const prevTop = Math.max(...sessions[1].map((r) => r.weight));
     if (top <= prevTop) {
-      const step = STEP[ex.carga] || 2.5;
-      const w = Math.max(0, top - step);
-      return { kind: 'down', weight: w, text: `Dos sesiones sin llegar a ${lo} reps: baja a ${fmt(w)} kg y recupera` };
+      const w = prevBelow(ex, top);
+      const how = rig(ex, w);
+      return { kind: 'down', weight: w, text: `Hoy: baja a ${fmt(w)} kg`, lines: [
+        `Por qué: dos sesiones seguidas sin llegar a ${lo} reps con ${fmt(top)} kg.`,
+        `Objetivo: ${goal}, sin ir al fallo, para recuperar y volver a subir.`,
+        ...(how ? [`Cómo montarlo: ${how}.`] : [])
+      ] };
     }
   }
   const best = Math.max(...at.map((r) => r.reps));
-  const goal = Math.min(hi, best + 1);
-  return { kind: 'hold', weight: top, text: bodyweight ? `Intenta ${goal} reps en cada serie` : `Mantén ${fmt(top)} kg e intenta ${goal} reps en cada serie` };
+  const next = Math.min(hi, best + 1);
+  const how = bodyweight ? '' : rig(ex, top);
+  return { kind: 'hold', weight: top, text: bodyweight ? `Hoy: ${next} reps en cada serie` : `Hoy: mantén ${fmt(top)} kg`, lines: [
+    `Última vez: ${lastTxt}.`,
+    `Objetivo: ${next} reps en cada serie${bodyweight ? '' : ` (tu techo es ${hi}: al llegar en todas, subes)`}.`,
+    ...(how ? [`Cómo montarlo: ${how}.`] : []),
+    'Si te sobra, añade una repetición; si no llegas, quédate donde estás.'
+  ] };
 }

@@ -4,6 +4,7 @@ import { EXERCISES, PROGRAM, nextMonday, sessionFor, videoUrl, weekVariant } fro
 import { beep, esc, flashCard, fmtClock, keepAwake, localDate, fmtTotal, primeRestAudio, startRestAudio, stopRestAudio, restAudioPlaying, releaseAwake, svg, toast, unlockAudio } from './util.js';
 import { suggestion } from './progress.js';
 import { bodyKg, startingWeight } from './starting.js';
+import { fmt as fmtL, nearest, rig } from './loads.js';
 import { backupDue, exportNow, snoozeBackup } from './backup.js';
 import { ZONES, affected, getMolestia, setMolestia } from './molestia.js';
 import { LOW_SLEEP_MIN, preloadGis, syncSleep } from './fitbit.js';
@@ -383,8 +384,8 @@ async function startSession(day, light = false) {
     let sug = await suggestion(ex.id, ex);
     if (!sug && !last) sug = await firstTimeTarget(ex);
     if (sug) targets[ex.id] = sug;
-    const lower = (w) => (dl.active && ex.carga !== 'peso-corporal' && w !== '' ? Math.max(0, round25(w * 0.85)) : w);
-    if (dl.active && sug && ex.carga !== 'peso-corporal') targets[ex.id] = { kind: 'hold', weight: lower(sug.weight), text: `Descarga: ${fmtKg(lower(sug.weight))} kg, sin llegar al fallo` };
+    const lower = (w) => (dl.active && ex.carga !== 'peso-corporal' && w !== '' ? Math.max(0, nearest(ex, w * 0.85)) : w);
+    if (dl.active && sug && ex.carga !== 'peso-corporal') targets[ex.id] = { kind: 'hold', weight: lower(sug.weight), text: `Descarga: ${fmtKg(lower(sug.weight))} kg`, lines: ['Por qué: semana de descarga, para recuperar.', `Objetivo: ${ex.sets - 1} series, sin llegar al fallo.`, ...(rig(ex, lower(sug.weight)) ? [`Cómo montarlo: ${rig(ex, lower(sug.weight))}.`] : [])] };
     sets[ex.id] = Array.from({ length: lightSets(ex, light) }, (_, i) => {
       const l = last && (last[i] || last[last.length - 1]);
       const st = !sug && !l && ex.start ? ex.start : null; // primera vez: valores de partida del ejercicio
@@ -397,9 +398,16 @@ async function startSession(day, light = false) {
 // Primera vez con un ejercicio: peso orientativo según tu peso corporal.
 async function firstTimeTarget(ex) {
   if (ex.start || ex.carga === 'peso-corporal') return null;
-  const w = startingWeight(ex.id, await bodyKg());
-  if (!w) return null;
-  return { kind: 'hold', weight: w, first: true, text: `Primera vez: prueba con unos ${fmtKg(w)} kg${ex.carga === 'mancuerna' ? ' en cada mano' : ''} y ajusta hasta dejar 3-4 reps en reserva` };
+  const base = startingWeight(ex.id, await bodyKg());
+  if (!base) return null;
+  const w = nearest(ex, base);
+  const how = rig(ex, w);
+  return { kind: 'hold', weight: w, first: true, text: `Primera vez: empieza con ${fmtKg(w)} kg`, lines: [
+    `Por qué: es un peso orientativo según tu peso corporal, pensado para ir cómodo.`,
+    `Objetivo: ${ex.sets} series de ${ex.reps[0]}-${ex.reps[1]} reps, dejando 3-4 en reserva.`,
+    ...(how ? [`Cómo montarlo: ${how}.`] : []),
+    `Ajuste: si haces más de ${ex.reps[1]} reps con facilidad, sube en la siguiente serie; si no llegas a ${ex.reps[0]}, baja.`
+  ] };
 }
 
 // Series de partida de un ejercicio: objetivo de progresión, última vez o valores iniciales.
@@ -615,7 +623,7 @@ async function showTrain() {
       <button class="mini" id="how">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.2-2.5 3.9"/><path d="M12 17.4v.1"/>', 18, 2)}Cómo se hace</button>
       <a class="mini" href="${videoUrl(id)}" target="_blank" rel="noopener">${svg('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10.5 9.5l4 2.5-4 2.5z"/>', 18, 2)}Ver vídeo</a>
     </div>
-    ${(session.targets || {})[id] ? `<div class="lastline target ${session.targets[id].kind}">${svg('<path d="M12 19V6M6 11l6-6 6 6"/>', 16, 2.4)}<span><strong>${esc(session.targets[id].text)}</strong></span></div>` : ''}
+    ${(session.targets || {})[id] ? `<div class="lastline target ${session.targets[id].kind}">${svg('<path d="M12 19V6M6 11l6-6 6 6"/>', 16, 2.4)}<span><strong>${esc(session.targets[id].text)}</strong>${(session.targets[id].lines || []).length ? `<ul class="tlines">${session.targets[id].lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</span></div>` : ''}
     ${last ? `<div class="lastline">${svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>', 16, 2)}<span>La última vez: <strong>${esc(last)}</strong></span></div>` : ((session.targets || {})[id] ? '' : '<div class="lastline muted">Primera vez con este ejercicio: empieza con un peso que te deje 3-4 repeticiones en reserva.</div>')}
     ${warmupHtml(id, sets)}
     <div style="display:flex;flex-direction:column;gap:10px" id="sets">
@@ -820,7 +828,7 @@ async function finishSession() {
   const ups = [];
   for (const id of rec.ids) {
     const sg = await suggestion(id, EXERCISES[id]);
-    if (sg && sg.kind === 'up') ups.push({ name: EXERCISES[id].name, text: sg.text });
+    if (sg && sg.kind === 'up') ups.push({ name: EXERCISES[id].name, text: sg.weight ? 'Sube a ' + fmtKg(sg.weight) + ' kg' : sg.text.replace('Hoy: ', '') });
   }
   summary = { ...rec, ups, minutes: Math.max(1, Math.round((new Date(finishedAt) - new Date(session.startedAt)) / 60000)) };
   session = null;
